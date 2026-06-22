@@ -287,6 +287,7 @@ func (fs *FunctionStatement) String() string {
 type FunctionExpression struct {
 	Token      token.Token // 'function'
 	Parameters []*Parameter
+	UseVars    []*Variable  // variables captured via `use ($a, $b, ...)`
 	Body       *BlockStatement
 }
 

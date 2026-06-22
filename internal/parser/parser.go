@@ -254,9 +254,50 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 		}
 	}
 
-	if p.peekTokenIs(token.ELSE) {
+	// Handle elseif (treated as chained else-if)
+	if p.peekTokenIs(token.ELSEIF) {
+		p.nextToken() // consume '}'
+		// curToken is now 'elseif'; reuse same IfStatement structure
+		elseifTok := p.curToken
+		elseif := &ast.IfStatement{Token: elseifTok}
+
+		if !p.expectPeek(token.LPAREN) {
+			return nil
+		}
+		p.nextToken() // consume '('
+		elseif.Condition = p.parseExpression(LOWEST)
+		if !p.expectPeek(token.RPAREN) {
+			return nil
+		}
+		p.nextToken() // consume ')'
+		if p.curTokenIs(token.LBRACE) {
+			elseif.Consequence = p.parseBlockStatement()
+		} else {
+			single := p.parseStatement()
+			if single != nil {
+				elseif.Consequence = &ast.BlockStatement{
+					Token:      token.Token{Type: token.LBRACE, Literal: "{"},
+					Statements: []ast.Statement{single},
+				}
+			}
+		}
+		// Recursively handle further elseif / else by re-using same logic
+		if p.peekTokenIs(token.ELSEIF) {
+			p.nextToken()
+			elseif.Alternative = p.parseElseIfChain()
+		} else if p.peekTokenIs(token.ELSE) {
+			p.nextToken()
+			p.nextToken()
+			if p.curTokenIs(token.LBRACE) {
+				elseif.Alternative = p.parseBlockStatement()
+			} else {
+				elseif.Alternative = p.parseStatement()
+			}
+		}
+		stmt.Alternative = elseif
+	} else if p.peekTokenIs(token.ELSE) {
 		p.nextToken() // consume consequence end
-		p.nextToken() // consume ELSE
+		p.nextToken() // consume 'else'
 
 		if p.curTokenIs(token.LBRACE) {
 			stmt.Alternative = p.parseBlockStatement()
@@ -266,6 +307,44 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 	}
 
 	return stmt
+}
+
+// parseElseIfChain parses a chained elseif (curToken = 'elseif')
+func (p *Parser) parseElseIfChain() *ast.IfStatement {
+	elseif := &ast.IfStatement{Token: p.curToken}
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+	p.nextToken()
+	elseif.Condition = p.parseExpression(LOWEST)
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+	p.nextToken()
+	if p.curTokenIs(token.LBRACE) {
+		elseif.Consequence = p.parseBlockStatement()
+	} else {
+		single := p.parseStatement()
+		if single != nil {
+			elseif.Consequence = &ast.BlockStatement{
+				Token:      token.Token{Type: token.LBRACE, Literal: "{"},
+				Statements: []ast.Statement{single},
+			}
+		}
+	}
+	if p.peekTokenIs(token.ELSEIF) {
+		p.nextToken()
+		elseif.Alternative = p.parseElseIfChain()
+	} else if p.peekTokenIs(token.ELSE) {
+		p.nextToken()
+		p.nextToken()
+		if p.curTokenIs(token.LBRACE) {
+			elseif.Alternative = p.parseBlockStatement()
+		} else {
+			elseif.Alternative = p.parseStatement()
+		}
+	}
+	return elseif
 }
 
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
@@ -888,11 +967,36 @@ func (p *Parser) parseFunctionExpression() ast.Expression {
 		return nil
 	}
 	params := p.parseFunctionParameters()
+
+	// Parse optional `use ($var1, $var2, ...)` clause
+	var useVars []*ast.Variable
+	if p.peekTokenIs(token.USE) {
+		p.nextToken() // consume 'use'
+		if !p.expectPeek(token.LPAREN) {
+			return nil
+		}
+		p.nextToken() // move past '('
+		for !p.curTokenIs(token.RPAREN) && !p.curTokenIs(token.EOF) {
+			// skip leading '&' for by-reference (treat same as by-value for now)
+			if p.curToken.Literal == "&" {
+				p.nextToken()
+			}
+			if p.curTokenIs(token.T_VARIABLE) {
+				useVars = append(useVars, &ast.Variable{Token: p.curToken, Value: p.curToken.Literal})
+			}
+			p.nextToken()
+			if p.curTokenIs(token.COMMA) {
+				p.nextToken()
+			}
+		}
+		// curToken is now ')'
+	}
+
 	if !p.expectPeek(token.LBRACE) {
 		return nil
 	}
 	body := p.parseBlockStatement()
-	return &ast.FunctionExpression{Token: tok, Parameters: params, Body: body}
+	return &ast.FunctionExpression{Token: tok, Parameters: params, UseVars: useVars, Body: body}
 }
 
 func (p *Parser) parseArrayLiteral() ast.Expression {

@@ -143,6 +143,70 @@ func (e *Environment) AddAlias(alias, name string) {
 }
 
 func registerBuiltins(env *Environment) {
+	// ---------------------------------------------------------
+	// Channel builtins: channel(), send($ch, $val), receive($ch)
+	// ---------------------------------------------------------
+	env.Set("channel", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			capacity := 0
+			if len(args) > 0 {
+				if cap, ok := args[0].(*Integer); ok {
+					capacity = int(cap.Value)
+				}
+			}
+			return &Channel{Ch: make(chan Object, capacity)}
+		},
+	})
+
+	env.Set("send", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			if len(args) < 2 {
+				return newError("send expects 2 arguments: send($channel, $value)")
+			}
+			ch, ok := args[0].(*Channel)
+			if !ok {
+				return newError("send: first argument must be a channel")
+			}
+			ch.Ch <- args[1]
+			return NULL
+		},
+	})
+
+	env.Set("receive", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			if len(args) == 0 {
+				return newError("receive expects 1 argument: receive($channel)")
+			}
+			ch, ok := args[0].(*Channel)
+			if !ok {
+				return newError("receive: argument must be a channel")
+			}
+			val, open := <-ch.Ch
+			if !open {
+				return NULL
+			}
+			return val
+		},
+	})
+
+	// intdiv($a, $b) — integer division
+	env.Set("intdiv", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			if len(args) < 2 {
+				return newError("intdiv expects 2 arguments")
+			}
+			a, aOk := args[0].(*Integer)
+			b, bOk := args[1].(*Integer)
+			if !aOk || !bOk {
+				return newError("intdiv: both arguments must be integers")
+			}
+			if b.Value == 0 {
+				return newError("intdiv: division by zero")
+			}
+			return NewInteger(a.Value / b.Value)
+		},
+	})
+
 	env.Set("spawn", &Builtin{
 		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
 			if len(args) == 0 {
@@ -228,6 +292,85 @@ func registerBuiltins(env *Environment) {
 			return TRUE
 		},
 	})
+
+	env.Set("strtoupper", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			if len(args) == 0 {
+				return newError("strtoupper expects 1 argument")
+			}
+			return &String{Value: strings.ToUpper(args[0].Inspect())}
+		},
+	})
+
+	env.Set("strtolower", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			if len(args) == 0 {
+				return newError("strtolower expects 1 argument")
+			}
+			return &String{Value: strings.ToLower(args[0].Inspect())}
+		},
+	})
+
+	env.Set("str_repeat", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			if len(args) < 2 {
+				return newError("str_repeat expects 2 arguments")
+			}
+			s := args[0].Inspect()
+			n, ok := args[1].(*Integer)
+			if !ok {
+				return newError("str_repeat: second argument must be an integer")
+			}
+			return &String{Value: strings.Repeat(s, int(n.Value))}
+		},
+	})
+
+	env.Set("trim", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			if len(args) == 0 {
+				return newError("trim expects 1 argument")
+			}
+			return &String{Value: strings.TrimSpace(args[0].Inspect())}
+		},
+	})
+
+	env.Set("str_replace", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			if len(args) < 3 {
+				return newError("str_replace expects 3 arguments")
+			}
+			search  := args[0].Inspect()
+			replace := args[1].Inspect()
+			subject := args[2].Inspect()
+			return &String{Value: strings.ReplaceAll(subject, search, replace)}
+		},
+	})
+
+	env.Set("number_format", &Builtin{
+		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {
+			if len(args) == 0 {
+				return newError("number_format expects at least 1 argument")
+			}
+			decimals := 0
+			if len(args) >= 2 {
+				if d, ok := args[1].(*Integer); ok {
+					decimals = int(d.Value)
+				}
+			}
+			var val float64
+			switch v := args[0].(type) {
+			case *Integer:
+				val = float64(v.Value)
+			case *Float:
+				val = v.Value
+			default:
+				return newError("number_format: first argument must be a number")
+			}
+			return &String{Value: fmt.Sprintf("%.*f", decimals, val)}
+		},
+	})
+
+
 
 	env.Set("strlen", &Builtin{
 		Fn: func(args []Object, callerEnv *Environment, out io.Writer) Object {

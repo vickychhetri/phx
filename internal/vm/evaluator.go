@@ -339,7 +339,18 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 		return NULL
 
 	case *ast.FunctionExpression:
-		return &Function{Parameters: n.Parameters, Body: n.Body, Env: env}
+		closureEnv := env
+		if len(n.UseVars) > 0 {
+			closureEnv = NewEnclosedEnvironment(env)
+			for _, v := range n.UseVars {
+				if val, ok := env.Get(v.Value); ok {
+					closureEnv.Set(v.Value, val)
+				} else {
+					closureEnv.Set(v.Value, NULL)
+				}
+			}
+		}
+		return &Function{Parameters: n.Parameters, Body: n.Body, Env: closureEnv}
 
 	case *ast.ArrayLiteral:
 		pairs := []*ArrayPair{}
