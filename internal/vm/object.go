@@ -60,7 +60,7 @@ func (i *Integer) Inspect() string  { return fmt.Sprintf("%d", i.Value) }
 
 const (
 	intCacheMin = -100
-	intCacheMax = 50000
+	intCacheMax = 5000000
 )
 
 var intCache [intCacheMax - intCacheMin + 1]*Integer

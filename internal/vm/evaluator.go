@@ -144,7 +144,7 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 		return result
 
 	case *ast.WhileStatement:
-		for {
+		whileLoop: for {
 			condition := Evaluate(n.Condition, env, out)
 			if isError(condition) {
 				return condition
@@ -154,30 +154,28 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 			}
 			result := Evaluate(n.Body, env, out)
 			if result != nil {
-				if result.Type() == ERROR_OBJ || result.Type() == RETURN_VALUE_OBJ || result.Type() == EXCEPTION_OBJ {
+				switch result.(type) {
+				case *Error, *ReturnValue, *ExceptionObject:
 					return result
-				}
-				if result.Type() == BREAK_OBJ {
-					break
-				}
-				if result.Type() == CONTINUE_OBJ {
-					continue
+				case *Break:
+					break whileLoop
+				case *Continue:
+					continue whileLoop
 				}
 			}
 		}
 		return NULL
 
 	case *ast.DoWhileStatement:
-		for {
+		doWhileLoop: for {
 			result := Evaluate(n.Body, env, out)
 			if result != nil {
-				if result.Type() == ERROR_OBJ || result.Type() == RETURN_VALUE_OBJ || result.Type() == EXCEPTION_OBJ {
+				switch result.(type) {
+				case *Error, *ReturnValue, *ExceptionObject:
 					return result
-				}
-				if result.Type() == BREAK_OBJ {
-					break
-				}
-				if result.Type() == CONTINUE_OBJ {
+				case *Break:
+					break doWhileLoop
+				case *Continue:
 					// continue checks condition next
 				}
 			}
@@ -198,7 +196,7 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 				return initVal
 			}
 		}
-		for {
+		forLoop: for {
 			if n.Condition != nil {
 				condition := Evaluate(n.Condition, env, out)
 				if isError(condition) {
@@ -210,13 +208,12 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 			}
 			result := Evaluate(n.Body, env, out)
 			if result != nil {
-				if result.Type() == ERROR_OBJ || result.Type() == RETURN_VALUE_OBJ || result.Type() == EXCEPTION_OBJ {
+				switch result.(type) {
+				case *Error, *ReturnValue, *ExceptionObject:
 					return result
-				}
-				if result.Type() == BREAK_OBJ {
-					break
-				}
-				if result.Type() == CONTINUE_OBJ {
+				case *Break:
+					break forLoop
+				case *Continue:
 					// continue executes post-expression next
 				}
 			}
@@ -1202,13 +1199,10 @@ func evalProgram(statements []ast.Statement, env *Environment, out io.Writer) Ob
 	for _, statement := range statements {
 		result = Evaluate(statement, env, out)
 		if result != nil {
-			if result.Type() == RETURN_VALUE_OBJ {
-				return result.(*ReturnValue).Value
-			}
-			if result.Type() == ERROR_OBJ || result.Type() == EXCEPTION_OBJ {
-				return result
-			}
-			if result.Type() == BREAK_OBJ || result.Type() == CONTINUE_OBJ {
+			switch r := result.(type) {
+			case *ReturnValue:
+				return r.Value
+			case *Error, *ExceptionObject, *Break, *Continue:
 				return result
 			}
 		}
@@ -1221,10 +1215,8 @@ func evalBlockStatement(statements []ast.Statement, env *Environment, out io.Wri
 	for _, statement := range statements {
 		result = Evaluate(statement, env, out)
 		if result != nil {
-			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == EXCEPTION_OBJ {
-				return result
-			}
-			if result.Type() == BREAK_OBJ || result.Type() == CONTINUE_OBJ {
+			switch result.(type) {
+			case *ReturnValue, *Error, *ExceptionObject, *Break, *Continue:
 				return result
 			}
 		}
@@ -1292,9 +1284,11 @@ func evalInfixExpression(operator string, left, right Object) Object {
 	}
 
 	// Relational string comparisons
-	if left.Type() == STRING_OBJ && right.Type() == STRING_OBJ {
-		lVal := left.(*String).Value
-		rVal := right.(*String).Value
+	lStr, lOk := left.(*String)
+	rStr, rOk := right.(*String)
+	if lOk && rOk {
+		lVal := lStr.Value
+		rVal := rStr.Value
 		switch operator {
 		case "<":
 			return nativeBoolToBooleanObject(lVal < rVal)
@@ -1311,7 +1305,9 @@ func evalInfixExpression(operator string, left, right Object) Object {
 }
 
 func evalNumericInfixExpression(operator string, left, right Object) Object {
-	isFloatOp := (left.Type() == FLOAT_OBJ || right.Type() == FLOAT_OBJ)
+	_, leftIsFloat := left.(*Float)
+	_, rightIsFloat := right.(*Float)
+	isFloatOp := leftIsFloat || rightIsFloat
 
 	if isFloatOp {
 		lVal := toFloat(left)
@@ -1399,7 +1395,15 @@ func isTruthy(obj Object) bool {
 }
 
 func isNumeric(obj Object) bool {
-	return obj.Type() == INTEGER_OBJ || obj.Type() == FLOAT_OBJ
+	if obj == nil {
+		return false
+	}
+	switch obj.(type) {
+	case *Integer, *Float:
+		return true
+	default:
+		return false
+	}
 }
 
 func toFloat(obj Object) float64 {
@@ -1507,10 +1511,15 @@ func newError(format string, a ...interface{}) *Error {
 }
 
 func isError(obj Object) bool {
-	if obj != nil {
-		return obj.Type() == ERROR_OBJ || obj.Type() == EXCEPTION_OBJ
+	if obj == nil {
+		return false
 	}
-	return false
+	switch obj.(type) {
+	case *Error, *ExceptionObject:
+		return true
+	default:
+		return false
+	}
 }
 
 func applyFunction(fn *Function, args []Object, out io.Writer) Object {

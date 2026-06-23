@@ -18,6 +18,7 @@ type Environment struct {
 	outer            *Environment
 	currentNamespace string
 	aliases          map[string]string
+	shared           bool
 }
 
 func NewEnvironment() *Environment {
@@ -26,6 +27,7 @@ func NewEnvironment() *Environment {
 		outer:            nil,
 		currentNamespace: "",
 		aliases:          make(map[string]string),
+		shared:           false,
 	}
 	registerBuiltins(env)
 	return env
@@ -37,13 +39,30 @@ func NewEnclosedEnvironment(outer *Environment) *Environment {
 		outer:            outer,
 		currentNamespace: "",
 		aliases:          make(map[string]string),
+		shared:           false,
 	}
 }
 
 var ActiveThreads int32
 
+func (e *Environment) MarkShared() {
+	if e == nil {
+		return
+	}
+	e.mu.Lock()
+	if e.shared {
+		e.mu.Unlock()
+		return
+	}
+	e.shared = true
+	e.mu.Unlock()
+	if e.outer != nil {
+		e.outer.MarkShared()
+	}
+}
+
 func (e *Environment) Get(name string) (Object, bool) {
-	if atomic.LoadInt32(&ActiveThreads) > 0 {
+	if e.shared {
 		e.mu.RLock()
 		obj, ok := e.store[name]
 		e.mu.RUnlock()
@@ -62,7 +81,7 @@ func (e *Environment) Get(name string) (Object, bool) {
 }
 
 func (e *Environment) Set(name string, val Object) Object {
-	if atomic.LoadInt32(&ActiveThreads) > 0 {
+	if e.shared {
 		e.mu.Lock()
 		e.store[name] = val
 		e.mu.Unlock()
@@ -73,7 +92,7 @@ func (e *Environment) Set(name string, val Object) Object {
 }
 
 func (e *Environment) ResolveName(name string) string {
-	if atomic.LoadInt32(&ActiveThreads) > 0 {
+	if e.shared {
 		e.mu.RLock()
 		defer e.mu.RUnlock()
 		return e.resolveNameUnlocked(name)
@@ -104,7 +123,7 @@ func (e *Environment) resolveNameUnlocked(name string) string {
 }
 
 func (e *Environment) QualifyName(name string) string {
-	if atomic.LoadInt32(&ActiveThreads) > 0 {
+	if e.shared {
 		e.mu.RLock()
 		defer e.mu.RUnlock()
 		return e.qualifyNameUnlocked(name)
@@ -123,7 +142,7 @@ func (e *Environment) qualifyNameUnlocked(name string) string {
 }
 
 func (e *Environment) SetNamespace(ns string) {
-	if atomic.LoadInt32(&ActiveThreads) > 0 {
+	if e.shared {
 		e.mu.Lock()
 		e.currentNamespace = ns
 		e.mu.Unlock()
@@ -133,7 +152,7 @@ func (e *Environment) SetNamespace(ns string) {
 }
 
 func (e *Environment) AddAlias(alias, name string) {
-	if atomic.LoadInt32(&ActiveThreads) > 0 {
+	if e.shared {
 		e.mu.Lock()
 		e.aliases[alias] = name
 		e.mu.Unlock()
@@ -218,6 +237,7 @@ func registerBuiltins(env *Environment) {
 				return newError("spawn first argument must be a function")
 			}
 			threadArgs := args[1:]
+			callable.Env.MarkShared()
 			t := &Thread{
 				Done: make(chan struct{}),
 			}

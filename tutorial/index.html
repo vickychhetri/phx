@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHX Language Tutorial</title>
+    <style>
+        body {
+            font-family: Georgia, serif;
+            color: #000000;
+            background-color: #ffffff;
+            line-height: 1.6;
+            margin: 40px auto;
+            max-width: 760px;
+            padding: 0 20px;
+        }
+
+        h1, h2, h3 {
+            font-family: monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 5px;
+            margin-top: 40px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 30px;
+            border-bottom: 4px solid #000000;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            border-bottom: 1px dashed #000000;
+        }
+
+        pre, code {
+            font-family: "Courier New", Courier, monospace;
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        pre {
+            border: 1px solid #000000;
+            padding: 15px;
+            overflow-x: auto;
+            margin: 20px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        code {
+            border: 1px dashed #cccccc;
+            padding: 2px 4px;
+        }
+
+        ul {
+            list-style-type: square;
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        a {
+            color: #000000;
+            text-decoration: underline;
+        }
+
+        a:hover {
+            background-color: #000000;
+            color: #ffffff;
+        }
+
+        nav {
+            border: 1px solid #000000;
+            padding: 15px;
+            margin-bottom: 40px;
+        }
+
+        nav ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        nav li {
+            display: inline-block;
+            margin-right: 15px;
+        }
+
+        .section-separator {
+            border-top: 1px solid #000000;
+            margin: 50px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PHX Language Tutorial</h1>
+    <p>Welcome to the PHX language tutorial. This document describes the syntax, features, and execution mechanisms supported by the PHX compiler.</p>
+
+    <nav>
+        <strong>TABLE OF CONTENTS</strong>
+        <ul>
+            <li><a href="#basics">1. Basics & Output</a></li>
+            <li><a href="#control-flow">2. Control Flow</a></li>
+            <li><a href="#loops">3. Loops</a></li>
+            <li><a href="#functions">4. Functions & Closures</a></li>
+            <li><a href="#oop">5. Classes & OOP</a></li>
+            <li><a href="#exceptions">6. Exceptions</a></li>
+            <li><a href="#file-io">7. File Operations</a></li>
+            <li><a href="#concurrency">8. Concurrency & Channels</a></li>
+            <li><a href="#compiler">9. Compiler CLI</a></li>
+        </ul>
+    </nav>
+
+    <!-- SECTION 1 -->
+    <section id="basics">
+        <h2>1. Basics & Output</h2>
+        <p>PHX uses a syntax derived from PHP. Programs must start with the standard <code>&lt;?php</code> tag. Comments are supported using <code>//</code> for single lines.</p>
+
+        <h3>Variable Declaration & Types</h3>
+        <p>Variables are dynamically typed and prefixed with a <code>$</code> character. Supported basic types include Integers, Floats, Booleans, Strings, Arrays, and Null.</p>
+        <pre>&lt;?php
+$name = "Vicky";      // String
+$age = 25;            // Integer
+$pi = 3.14159;        // Float
+$isCompilerDeveloper = true; // Boolean
+$noValue = null;      // Null
+?&gt;</pre>
+
+        <h3>Standard Output</h3>
+        <p>To print output to the console, use the <code>echo</code> statement or the <code>print_r()</code> function for arrays.</p>
+        <pre>&lt;?php
+echo "Hello, PHX!\n";
+echo "Name: " . $name . "\n"; // Concatenation using '.'
+?&gt;</pre>
+    </section>
+
+    <div class="section-separator"></div>
+
+    <!-- SECTION 2 -->
+    <section id="control-flow">
+        <h2>2. Control Flow</h2>
+        <p>PHX supports standard conditional branching constructs.</p>
+
+        <h3>If / Else If / Else</h3>
+        <pre>&lt;?php
+$score = 85;
+
+if ($score >= 90) {
+    echo "Grade: A\n";
+} else if ($score >= 80) {
+    echo "Grade: B\n";
+} else {
+    echo "Grade: C\n";
+}
+?&gt;</pre>
+
+        <h3>Switch Statement</h3>
+        <p>The <code>switch</code> statement matches a value sequentially against several case blocks.</p>
+        <pre>&lt;?php
+$day = 3;
+switch ($day) {
+    case 1:
+        echo "Monday\n";
+        break;
+    case 2:
+        echo "Tuesday\n";
+        break;
+    case 3:
+        echo "Wednesday\n";
+        break;
+    default:
+        echo "Unknown day\n";
+        break;
+}
+?&gt;</pre>
+
+        <h3>Ternary Operators</h3>
+        <pre>&lt;?php
+$status = ($score >= 50) ? "Pass" : "Fail";
+echo $status . "\n";
+?&gt;</pre>
+    </section>
+
+    <div class="section-separator"></div>
+
+    <!-- SECTION 3 -->
+    <section id="loops">
+        <h2>3. Loops</h2>
+        <p>Loops run block statements repeatedly based on conditions.</p>
+
+        <h3>While & Do-While</h3>
+        <pre>&lt;?php
+$i = 1;
+while ($i <= 5) {
+    echo $i . "\n";
+    $i++;
+}
+
+$x = 1;
+do {
+    echo $x . "\n";
+    $x++;
+} while ($x <= 5);
+?&gt;</pre>
+
+        <h3>For Loops</h3>
+        <pre>&lt;?php
+for ($i = 0; $i < 5; $i++) {
+    echo "Iteration " . $i . "\n";
+}
+?&gt;</pre>
+
+        <h3>Array Iteration (Foreach equivalent)</h3>
+        <p>Iterate indexed or associative arrays using the <code>for</code> syntax key-value matching.</p>
+        <pre>&lt;?php
+$fruits = array("Apple", "Banana", "Cherry");
+for ($i = 0; $i < count($fruits); $i++) {
+    echo $fruits[$i] . "\n";
+}
+?&gt;</pre>
+    </section>
+
+    <div class="section-separator"></div>
+
+    <!-- SECTION 4 -->
+    <section id="functions">
+        <h2>4. Functions & Closures</h2>
+        <p>Functions isolate computational logic. They can accept arguments and return values.</p>
+
+        <h3>Custom Functions</h3>
+        <pre>&lt;?php
+function add($a, $b) {
+    return $a + b;
+}
+echo add(5, 10) . "\n";
+?&gt;</pre>
+
+        <h3>Closures & Variable Scope Binding</h3>
+        <p>Closures are anonymous functions. PHX supports PHP-style explicit environment capture using the <code>use</code> keyword.</p>
+        <pre>&lt;?php
+$base = 100;
+$multiplier = function($val) use ($base) {
+    return $val * $base;
+};
+echo $multiplier(5) . "\n"; // Output: 500
+?&gt;</pre>
+    </section>
+
+    <div class="section-separator"></div>
+
+    <!-- SECTION 5 -->
+    <section id="oop">
+        <h2>5. Classes & Object-Oriented Programming (OOP)</h2>
+        <p>PHX supports basic class structures, inheritance, encapsulation, and class instantiation.</p>
+
+        <h3>Class Definition & Inheritance</h3>
+        <pre>&lt;?php
+class Animal {
+    public $name;
+
+    public function __construct($name) {
+        $this->name = $name;
+    }
+
+    public function speak() {
+        return "Generic Sound";
+    }
+}
+
+class Dog extends Animal {
+    public function speak() {
+        return "Woof";
+    }
+}
+
+$dog = new Dog("Rex");
+echo $dog->name . " says " . $dog->speak() . "\n";
+?&gt;</pre>
+    </section>
+
+    <div class="section-separator"></div>
+
+    <!-- SECTION 6 -->
+    <section id="exceptions">
+        <h2>6. Exceptions</h2>
+        <p>PHX translates throwing and catching exceptions directly to native panic/recovery blocks in Go.</p>
+
+        <h3>Try-Catch Blocks</h3>
+        <pre>&lt;?php
+try {
+    throw new Exception("Something went wrong");
+} catch (Exception $e) {
+    echo "Caught exception: " . $e->getMessage() . "\n";
+}
+?&gt;</pre>
+    </section>
+
+    <div class="section-separator"></div>
+
+    <!-- SECTION 7 -->
+    <section id="file-io">
+        <h2>7. File Operations</h2>
+        <p>Files are read and written using the built-in <code>File</code> class.</p>
+
+        <h3>Reading & Writing Files</h3>
+        <pre>&lt;?php
+$file = new File();
+
+// Write to file
+$file->open("test.txt", "w");
+$file->write("Line 1\nLine 2\n");
+$file->close();
+
+// Read from file
+$file->open("test.txt", "r");
+$lines = $file->readLines();
+$file->close();
+
+for ($i = 0; $i < count($lines); $i++) {
+    echo "Read: " . $lines[$i] . "\n";
+}
+
+// Check existence & Delete
+if ($file->exists("test.txt")) {
+    $file->delete("test.txt");
+}
+?&gt;</pre>
+    </section>
+
+    <div class="section-separator"></div>
+
+    <!-- SECTION 8 -->
+    <section id="concurrency">
+        <h2>8. Concurrency & Channels</h2>
+        <p>PHX features powerful Go-native concurrency tools built straight into the compiler language model.</p>
+
+        <h3>Spawning Threads & Joining Results</h3>
+        <p>The <code>spawn()</code> statement runs a closure asynchronously in a Go goroutine and returns a <code>Thread</code>. Call <code>join()</code> on the thread to block execution until the thread terminates and returns its result.</p>
+        <pre>&lt;?php
+$thread = spawn(function() {
+    sleep(1);
+    return 100;
+});
+
+// Do other work here...
+
+$result = $thread->join();
+echo "Thread result: " . $result . "\n";
+?&gt;</pre>
+
+        <h3>Using Channels</h3>
+        <p>Channels allow threads to communicate with each other safely. Create channels with <code>channel(capacity)</code>, send values using <code>send(chan, val)</code>, and receive values using <code>receive(chan)</code>.</p>
+        <pre>&lt;?php
+$ch = channel(5);
+
+spawn(function() use ($ch) {
+    send($ch, "Message from thread");
+});
+
+$msg = receive($ch);
+echo "Received: " . $msg . "\n";
+?&gt;</pre>
+    </section>
+
+    <div class="section-separator"></div>
+
+    <!-- SECTION 9 -->
+    <section id="compiler">
+        <h2>9. Compiler CLI Usage</h2>
+        <p>Once you write a PHX program, you can run or build it using the PHX toolchain executable.</p>
+
+        <h3>Compile and Run:</h3>
+        <pre>$ bin/phx run your_program.php</pre>
+
+        <h3>Build a Standalone Binary:</h3>
+        <pre>$ bin/phx build -o bin/output_executable your_program.php
+$ ./bin/output_executable</pre>
+    </section>
+
+</body>
+</html>

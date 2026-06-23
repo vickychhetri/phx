@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,10 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"phx/internal/ast"
+	"phx/internal/compiler"
 	"phx/internal/lexer"
 	"phx/internal/parser"
 	"phx/internal/vm"
-	"strconv"
 )
 
 var EmbeddedMainPHP string
@@ -164,14 +163,54 @@ func runInterpreter(filePath string) {
 		os.Exit(1)
 	}
 
-	env := vm.NewEnvironment()
-	result := vm.Evaluate(program, env, os.Stdout)
-	if errObj, ok := result.(*vm.Error); ok {
-		fmt.Fprintf(os.Stderr, "Runtime Error: %s\n", errObj.Message)
+	// Compile PHP AST to Go code
+	comp := compiler.New()
+	goCode, err := comp.Compile(program)
+	if err != nil {
+		fmt.Printf("Compilation Error: %v\n", err)
 		os.Exit(1)
 	}
-	if result != nil && result.Type() == "EXCEPTION" {
-		fmt.Fprintf(os.Stderr, "Uncaught Exception: %s\n", result.Inspect())
+
+	// Create temporary directory for building
+	tempDir, err := ioutil.TempDir(".", "phx_run_")
+	if err != nil {
+		fmt.Printf("Error creating temp dir: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(tempDir)
+
+	tempGoFile := filepath.Join(tempDir, "main.go")
+	err = ioutil.WriteFile(tempGoFile, []byte(goCode), 0644)
+	if err != nil {
+		fmt.Printf("Error writing temporary Go file: %v\n", err)
+		os.RemoveAll(tempDir)
+		os.Exit(1)
+	}
+
+	tempBin := filepath.Join(tempDir, "app")
+	buildCmd := exec.Command("go", "build", "-o", tempBin, tempGoFile)
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+	err = buildCmd.Run()
+	if err != nil {
+		fmt.Printf("Error compiling binary: %v\n", err)
+		os.RemoveAll(tempDir)
+		os.Exit(1)
+	}
+
+	// Execute binary
+	runCmd := exec.Command(tempBin)
+	runCmd.Stdin = os.Stdin
+	runCmd.Stdout = os.Stdout
+	runCmd.Stderr = os.Stderr
+	err = runCmd.Run()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			os.RemoveAll(tempDir)
+			os.Exit(exitErr.ExitCode())
+		}
+		fmt.Printf("Error running binary: %v\n", err)
+		os.RemoveAll(tempDir)
 		os.Exit(1)
 	}
 }
@@ -355,75 +394,16 @@ func runBuild(mainFilePath string, outputBinary string) {
 		os.Exit(1)
 	}
 
-	mainDir := filepath.Dir(absMainPath)
-
 	mainContent, err := ioutil.ReadFile(absMainPath)
 	if err != nil {
 		fmt.Printf("Error reading main file: %v\n", err)
 		os.Exit(1)
 	}
 
-	embeddedFiles := make(map[string]string)
-	err = filepath.Walk(mainDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if filepath.Ext(path) == ".php" {
-			rel, err := filepath.Rel(mainDir, path)
-			if err != nil {
-				return err
-			}
-			content, err := ioutil.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			embeddedFiles[rel] = string(content)
-		}
-		return nil
-	})
-	if err != nil {
-		fmt.Printf("Error walking directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Create temp folder
-	tempDir := filepath.Join(".", "_phx_build_temp")
-	err = os.MkdirAll(tempDir, 0755)
-	if err != nil {
-		fmt.Printf("Error creating temp dir: %v\n", err)
-		os.Exit(1)
-	}
-	defer os.RemoveAll(tempDir)
-
-	var buf bytes.Buffer
-	buf.WriteString("package main\n\n")
-	buf.WriteString("import (\n")
-	buf.WriteString("\t\"fmt\"\n")
-	buf.WriteString("\t\"os\"\n")
-	buf.WriteString("\t\"phx/internal/lexer\"\n")
-	buf.WriteString("\t\"phx/internal/parser\"\n")
-	buf.WriteString("\t\"phx/internal/vm\"\n")
-	buf.WriteString(")\n\n")
-
-	// Embed main script
-	buf.WriteString(fmt.Sprintf("var EmbeddedMainPHP = %s\n\n", strconv.Quote(string(mainContent))))
-
-	// Embed other files
-	buf.WriteString("var EmbeddedFiles = map[string]string{\n")
-	for relPath, content := range embeddedFiles {
-		buf.WriteString(fmt.Sprintf("\t%s: %s,\n", strconv.Quote(relPath), strconv.Quote(content)))
-	}
-	buf.WriteString("}\n\n")
-
-	// Main function
-	buf.WriteString(`func main() {
-	vm.VirtualFilesystem = EmbeddedFiles
-	l := lexer.New(EmbeddedMainPHP)
+	l := lexer.New(string(mainContent))
 	p := parser.New(l)
 	program := p.ParseProgram()
+
 	if len(p.Errors()) > 0 {
 		fmt.Println("Parser Errors encountered:")
 		for _, errStr := range p.Errors() {
@@ -431,23 +411,28 @@ func runBuild(mainFilePath string, outputBinary string) {
 		}
 		os.Exit(1)
 	}
-	env := vm.NewEnvironment()
-	result := vm.Evaluate(program, env, os.Stdout)
-	if errObj, ok := result.(*vm.Error); ok {
-		fmt.Fprintf(os.Stderr, "Runtime Error: %s\n", errObj.Message)
+
+	// Compile to Go
+	comp := compiler.New()
+	goCode, err := comp.Compile(program)
+	if err != nil {
+		fmt.Printf("Compilation Error: %v\n", err)
 		os.Exit(1)
 	}
-	if result != nil && result.Type() == "EXCEPTION" {
-		fmt.Fprintf(os.Stderr, "Uncaught Exception: %s\n", result.Inspect())
+
+	// Create temp folder
+	tempDir, err := ioutil.TempDir(".", "phx_build_")
+	if err != nil {
+		fmt.Printf("Error creating temp dir: %v\n", err)
 		os.Exit(1)
 	}
-}
-`)
+	defer os.RemoveAll(tempDir)
 
 	tempGoFile := filepath.Join(tempDir, "main.go")
-	err = ioutil.WriteFile(tempGoFile, buf.Bytes(), 0644)
+	err = ioutil.WriteFile(tempGoFile, []byte(goCode), 0644)
 	if err != nil {
 		fmt.Printf("Error writing temporary Go file: %v\n", err)
+		os.RemoveAll(tempDir)
 		os.Exit(1)
 	}
 
@@ -457,6 +442,7 @@ func runBuild(mainFilePath string, outputBinary string) {
 	err = cmd.Run()
 	if err != nil {
 		fmt.Printf("Error running go build: %v\n", err)
+		os.RemoveAll(tempDir)
 		os.Exit(1)
 	}
 

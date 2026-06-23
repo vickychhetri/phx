@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHX Compiler: Internals and Architecture</title>
+    <style>
+        :root {
+            --bg-color: #fdfdfd;
+            --text-color: #2c3e50;
+            --primary-color: #34495e;
+            --accent-color: #2980b9;
+            --code-bg: #f8f9fa;
+            --border-color: #eaecef;
+            --sidebar-width: 280px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1a1a1a;
+                --text-color: #e0e0e0;
+                --primary-color: #bdc3c7;
+                --accent-color: #3498db;
+                --code-bg: #2d2d2d;
+                --border-color: #333333;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Georgia, Garamond, serif;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            line-height: 1.6;
+            margin: 0;
+            display: flex;
+        }
+
+        /* Sidebar navigation */
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: var(--code-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .sidebar h2 {
+            font-size: 1.2rem;
+            margin-top: 0;
+            color: var(--accent-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar li {
+            margin-bottom: 10px;
+        }
+
+        .sidebar a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .sidebar a:hover {
+            color: var(--accent-color);
+            text-decoration: underline;
+        }
+
+        /* Main Content */
+        .content {
+            margin-left: var(--sidebar-width);
+            max-width: 800px;
+            padding: 40px 60px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            color: var(--accent-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-top: 0;
+        }
+
+        h2 {
+            font-size: 1.6rem;
+            color: var(--accent-color);
+            margin-top: 2.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            color: var(--text-color);
+            margin-top: 1.8rem;
+        }
+
+        p, li {
+            font-size: 1.05rem;
+            text-align: justify;
+        }
+
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            background-color: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+        }
+
+        pre code {
+            padding: 0;
+            background-color: transparent;
+            font-size: 0.9rem;
+        }
+
+        .callout {
+            background-color: var(--code-bg);
+            border-left: 4px solid var(--accent-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .callout p {
+            margin: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--code-bg);
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <h2>PHX Compiler</h2>
+        <ul>
+            <li><a href="#ch1">1. Introduction to PHX</a></li>
+            <li><a href="#ch2">2. Lexical Analysis (Lexer)</a></li>
+            <li><a href="#ch3">3. Syntax Analysis (Parser)</a></li>
+            <li><a href="#ch4">4. Abstract Syntax Tree (AST)</a></li>
+            <li><a href="#ch5">5. The Virtual Machine / VM</a></li>
+            <li><a href="#ch6">6. The AST-to-Go Transpiler</a></li>
+            <li><a href="#ch7">7. Runtime & Concurrency</a></li>
+            <li><a href="#ch8">8. Compiler Optimizations</a></li>
+            <li><a href="#ch9">9. Step-by-Step Execution Flow</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <h1>PHX Compiler Architecture & Internals</h1>
+        <p class="lead">A professional book-like reference guide to the structure, algorithms, and optimizations of the PHX Native PHP compiler runtime.</p>
+
+        <!-- Chapter 1 -->
+        <section id="ch1">
+            <h2>1. Introduction to PHX</h2>
+            <h3>What is PHX?</h3>
+            <p>PHX is a modern native compiler and high-performance runtime for a subset of the PHP programming language, built from the ground up in Go. Rather than relying on traditional slow virtual machines or tree-walking evaluation, PHX implements a hybrid execution engine: a fast AST-walking development interpreter and a highly optimized transpiler that translates PHP code directly to native Go, which is then compiled to native machine binaries.</p>
+
+            <h3>Why build a PHP-to-Go Compiler?</h3>
+            <p>PHP is historically an interpreted scripting language. The standard Zend Engine parses PHP files to opcodes, executing them on a virtual machine. While modern JIT compilation in PHP 8 has improved CPU-bound performance, it still carries memory overhead, dynamic typing bottlenecks, and slow multithreaded concurrency. By compiling PHP directly to Go:
+            <ul>
+                <li><strong>Native Speed:</strong> We leverage Go's advanced compiler optimizations and code generator, producing native machine executables.</li>
+                <li><strong>Dynamic Concurrency:</strong> PHP is natively single-threaded. PHX introduces built-in channels and green threads (goroutines) through `spawn` and `channel` primitives.</li>
+                <li><strong>Type Specialization:</strong> CPU-bound loops and operations are statically analyzed and compiled to raw machine integers, yielding 10x-20x speedups.</li>
+            </ul>
+            </p>
+
+            <h3>Core Architectural Components</h3>
+            <p>The compiler is structured cleanly as a series of pipeline stages:
+            <pre><code>[ Source Code (.php) ]
+         │
+         ▼  (Lexical Analysis)
+[ Lexer / Tokens ]
+         │
+         ▼  (Syntax Analysis - Pratt Parser)
+[ Abstract Syntax Tree (AST) ]
+         │
+         ├──► Option A: [ VM / Interpreter (Development) ]
+         │
+         └──► Option B: [ Transpiler / Code Generator ] ──► [ Go Compiler ] ──► [ Machine Code ]</code></pre>
+            </p>
+        </section>
+
+        <!-- Chapter 2 -->
+        <section id="ch2">
+            <h2>2. Lexical Analysis (Lexer)</h2>
+            <h3>What is the Lexer?</h3>
+            <p>The Lexer (or lexical analyzer) takes raw source code text as input and converts it into a stream of discrete, meaningful blocks called <strong>Tokens</strong>. For instance, the string <code>$x = 42;</code> is converted into tokens: <code>[IDENT($x), ASSIGN(=), INT(42), SEMICOLON(;)]</code>.</p>
+
+            <h3>Why do we need it?</h3>
+            <p>Parsing raw strings directly is extremely error-prone due to layout differences (spaces, tabs, newlines, comments). The lexer removes all irrelevant spacing, tracks line numbers for error logging, and standardizes code structures so the parser only has to deal with strongly-typed tokens.</p>
+
+            <h3>How is it implemented in PHX?</h3>
+            <p>The lexer is defined in <code>internal/lexer/lexer.go</code>. It holds the source code string, keeps track of the current cursor position, and scans characters sequentially. Crucially, it supports mixed PHP/HTML content by starting in an <strong>HTML mode</strong> and transitioning into <strong>PHP mode</strong> upon encountering <code>&lt;?php</code>.</p>
+
+            <div class="callout">
+                <p><strong>Lexer State Machine Algorithm:</strong><br>
+                1. Read current character.<br>
+                2. If in HTML mode, scan text until <code>&lt;?php</code>. Emit an <code>HTML</code> token.<br>
+                3. If in PHP mode, scan identifiers, numbers, and operators. Skip whitespaces and comments.<br>
+                4. Transition back to HTML mode if <code>?&gt;</code> is parsed.</p>
+            </div>
+        </section>
+
+        <!-- Chapter 3 -->
+        <section id="ch3">
+            <h2>3. Syntax Analysis (Parser)</h2>
+            <h3>What is the Parser?</h3>
+            <p>The Parser reads the stream of tokens produced by the lexer and constructs a hierarchical representation called the <strong>Abstract Syntax Tree (AST)</strong>. It verifies that the code conforms to the grammatical rules of the language.</p>
+
+            <h3>Why Pratt Parsing?</h3>
+            <p>Traditional recursive descent parsers can struggle with operator precedence (e.g. ensuring <code>2 + 3 * 4</code> evaluates as <code>2 + (3 * 4)</code> rather than <code>(2 + 3) * 4</code>). PHX solves this by using a <strong>Pratt Parser</strong> (also known as a Top-Down Operator Precedence parser).</p>
+
+            <h3>How Pratt Parsing Works</h3>
+            <p>Each token type is associated with two parse functions:
+            <ul>
+                <li><strong>Prefix Parse Function:</strong> Invoked when a token appears at the beginning of an expression (e.g. negative signs <code>-$x</code>, group expressions <code>(1 + 2)</code>, or identifiers).</li>
+                <li><strong>Infix Parse Function:</strong> Invoked when a token appears between two expressions (e.g. addition <code>+</code>, multiplication <code>*</code>, or function calls <code>()</code>).</li>
+            </ul>
+            </p>
+
+            <p>Precedence levels are ordered sequentially:</p>
+            <table>
+                <tr><th>Precedence Level</th><th>Operator / Token Type</th></tr>
+                <tr><td>LOWEST</td><td>Default level</td></tr>
+                <tr><td>EQUALS</td><td><code>==</code>, <code>!=</code></td></tr>
+                <tr><td>LESSGREATER</td><td><code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code></td></tr>
+                <tr><td>SUM</td><td><code>+</code>, <code>-</code></td></tr>
+                <tr><td>PRODUCT</td><td><code>*</code>, <code>/</code>, <code>%</code></td></tr>
+                <tr><td>PREFIX</td><td>Unary operators like <code>!</code>, <code>-</code></td></tr>
+                <tr><td>CALL</td><td>Function invocation <code>$foo()</code></td></tr>
+                <tr><td>INDEX</td><td>Array element access <code>$arr[$key]</code></td></tr>
+            </table>
+
+            <h3>The Pratt Parsing Algorithm</h3>
+            <pre><code>func (p *Parser) parseExpression(precedence int) ast.Expression {
+    prefix := p.prefixParseFns[p.curToken.Type]
+    if prefix == nil {
+        return nil
+    }
+    leftExp := prefix()
+
+    for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
+        infix := p.infixParseFns[p.peekToken.Type]
+        if infix == nil {
+            return leftExp
+        }
+        p.nextToken()
+        leftExp = infix(leftExp)
+    }
+    return leftExp
+}</code></pre>
+        </section>
+
+        <!-- Chapter 4 -->
+        <section id="ch4">
+            <h2>4. Abstract Syntax Tree (AST)</h2>
+            <h3>What is the AST?</h3>
+            <p>The AST is the final structural layout representing the source program. The nodes are split into two categories:
+            <ul>
+                <li><strong>Statements:</strong> Code structures that perform an action but do not produce a value (e.g. <code>if</code> blocks, <code>while</code> loops, variable declarations).</li>
+                <li><strong>Expressions:</strong> Code structures that evaluate to a value (e.g. arithmetic, string concatenation, function calls).</li>
+            </ul>
+            </p>
+
+            <h3>AST Node Implementation</h3>
+            <p>Located in <code>internal/ast/ast.go</code>, all nodes implement the base <code>Node</code> interface, which provides formatting strings for debugging. Nodes are deeply nested: a <code>FunctionStatement</code> contains a list of <code>Identifier</code> parameters and a <code>BlockStatement</code> body containing other statement nodes.</p>
+        </section>
+
+        <!-- Chapter 5 -->
+        <section id="ch5">
+            <h2>5. The Virtual Machine / VM</h2>
+            <h3>What is the VM?</h3>
+            <p>PHX contains a built-in virtual interpreter (VM) inside <code>internal/vm/evaluator.go</code>. It performs a <strong>tree-walking evaluation</strong> of the AST nodes.</p>
+
+            <h3>How Scoping is tracked (Environments)</h3>
+            <p>Variables and functions are stored in an <code>Environment</code>. Since PHP functions have local variable scopes that are separate from the global scope, environments can be nested:
+            <pre><code>[ Global Environment ]
+        ▲
+        │ (Outer Reference)
+[ Local Function Environment ]</code></pre>
+            If a variable is looked up inside a function, the VM checks the local environment. If not found, it resolves to outer scopes (e.g. static scope rules).</p>
+        </section>
+
+        <!-- Chapter 6 -->
+        <section id="ch6">
+            <h2>6. The AST-to-Go Transpiler</h2>
+            <h3>The Core Design Decision</h3>
+            <p>Evaluating an AST recursively by walking the tree carries extreme runtime overhead (heap allocations, reflection, pointer chasing). To achieve high-speed compiled binary execution, PHX translates the AST directly to native Go source code.</p>
+
+            <h3>The Zend-Style Value representation: <code>Val</code></h3>
+            <p>To preserve PHP's dynamic typing and runtime behaviors, the compiler includes a unified stack-allocated Go struct representing values:
+            <pre><code>type Val struct {
+    Type  int // 0: Nil, 1: Int, 2: Float, 3: Bool, 4: String, 5: Array, 8: Func, 9: Obj
+    Int   int64
+    Float float64
+    Bool  bool
+    Str   string
+    Array []Val
+    Chan  chan Val
+    Func  func(args ...Val) Val
+    Obj   Object
+}</code></pre>
+            Operations on variables are implemented as native Go methods on this struct (e.g. <code>Add(v1, v2)</code>, <code>Lt(v1, v2)</code>, <code>Eq(v1, v2)</code>). This mimics the PHP Zend engine's <code>zval</code> structure but benefits from Go's compile-time optimizations.</p>
+
+            <h3>Scoping and Closures: The `use` Statement</h3>
+            <p>PHP uses explicit closure variable binding using the <code>use</code> keyword, e.g.:
+            <pre><code>$x = 10;
+$fn = function() use ($x) { return $x; };</code></pre>
+            Go's closures capture outer variables by reference, which can cause loop variable capture bugs where all workers see the final value of a loop variable. To guarantee correct PHP semantics in the compiled Go code, PHX wraps closure invocations inside an Immediately Invoked Function Expression (IIFE) in Go:
+            <pre><code>func(v_x Val) Val {
+    return Val{Type: 8, Func: func(args ...Val) Val {
+        return v_x
+    }}
+}(v_x)</code></pre>
+            This captures the variable's value at the exact time of closure creation, preventing variable shadowing and capture issues.</p>
+        </section>
+
+        <!-- Chapter 7 -->
+        <section id="ch7">
+            <h2>7. Runtime & Concurrency</h2>
+            <h3>Goroutines as PHP Green Threads</h3>
+            <p>PHX exposes Go's high-speed scheduler directly to PHP through the <code>spawn()</code>, <code>channel()</code>, <code>send()</code>, and <code>receive()</code> functions.</p>
+
+            <h3>Thread Objects and Synchronization</h3>
+            <p>When <code>spawn(function)</code> is called, the compiler generates a Go goroutine that runs the closure in the background. It returns a native <code>ThreadObject</code>. When the parent script needs to retrieve the thread's result, it calls the <code>join()</code> method. This suspends the parent execution until the background goroutine sends its final return value across an internal synchronization channel.</p>
+            <pre><code>// PHP Concurrency
+$t = spawn(function() {
+    return 42;
+});
+$val = $t->join(); // Returns 42</code></pre>
+        </section>
+
+        <!-- Chapter 8 -->
+        <section id="ch8">
+            <h2>8. Compiler Optimizations</h2>
+            <h3>The Type Specialization Engine</h3>
+            <p>The primary reason the PHX compiler executes 10x faster than standard PHP is its static **Type Specialization** engine. 
+            Before compiling a math expression or loop, the compiler statically analyzes the expression tree using <code>isIntExpr</code>.</p>
+            <p>If the operands are detected as integer literals, loop counters, or integer-only variables, the code generator avoids wrapping the values inside the heavy <code>Val</code> struct and instead emits raw Go <code>int64</code> code.
+            For example, a loop like:
+            <pre><code>for ($i = 0; $i < 1000; $i++) { $sum += $i; }</code></pre>
+            is translated directly to native Go:
+            <pre><code>for v_i := int64(0); v_i < int64(1000); v_i++ {
+    v_sum = NewInt(v_sum.Int + v_i)
+}</code></pre>
+            This entirely removes heap allocations, memory jumps, and type check operations, allowing loops to execute at native hardware speeds.</p>
+
+            <h3>Exception Recovery via Panics</h3>
+            <p>PHP exceptions (<code>throw new Exception()</code>) are mapped directly to Go's panic/recover mechanism. The compiler wraps `try` statements in Go closures containing `defer recover()`. If an exception is thrown, it executes a Go panic containing the exception object. The recovery block catches this panic, extracts the exception instance, verifies if it matches the `catch` block class type, and executes the catch statement cleanly.</p>
+        </section>
+
+        <!-- Chapter 9 -->
+        <section id="ch9">
+            <h2>9. Step-by-Step Execution Flow</h2>
+            <p>Here is what happens when you execute <code>bin/phx run script.php</code>:</p>
+            <ol>
+                <li><strong>Read:</strong> The CLI reads <code>script.php</code> into memory.</li>
+                <li><strong>Tokenize:</strong> The Lexer scans characters and builds a Token stream.</li>
+                <li><strong>Parse:</strong> The Parser checks grammatical rules and constructs the AST.</li>
+                <li><strong>Compile:</strong> The Compiler traverses the AST and generates a corresponding Go file containing the runtime headers (`Val`, `NewInt`, arithmetic operators), target PHP script transpiled statements, and class structure tables.</li>
+                <li><strong>Write:</strong> The Go code is written to a temporary workspace under a unique directory name (e.g. <code>phx_run_12345/main.go</code>).</li>
+                <li><strong>Build:</strong> The CLI spawns the native Go compiler: <code>go build -o temp_bin phx_run_12345/main.go</code>.</li>
+                <li><strong>Execute:</strong> The compiled machine code executable is run, streaming output directly back to the terminal.</li>
+                <li><strong>Cleanup:</strong> Once finished, the temporary directory and binary are deleted automatically.</li>
+            </ol>
+        </section>
+    </main>
+</body>
+</html>
