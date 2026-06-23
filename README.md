@@ -85,8 +85,8 @@ We measured CPU performance using a multi-threaded prime-number summation algori
 
 | Runtime / Engine | Execution Mode | Parallel Workers | Execution Time | Speedup vs Native PHP |
 | :--- | :--- | :--- | :--- | :--- |
-| **Native PHP 8.x** | Interpreted / VM | 1 (Single-Thread) | **~165.65 sec** | 1.0x (Baseline) |
-| **PHX Native Compiler** | Go Machine Code | 4 (Goroutines) | **~12.68 sec** | **13.0x Faster** |
+| **Native PHP 8.x** | Interpreted / VM | 1 (Single-Thread) | **~148.49 sec** | 1.0x (Baseline) |
+| **PHX Native Compiler** | Go Machine Code | 4 (Goroutines) | **~12.40 sec** | **~12.0x Faster** |
 
 ---
 
