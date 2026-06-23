@@ -107,6 +107,9 @@ const (
 	REQUIRE_ONCE = "require_once"
 	NAMESPACE    = "namespace"
 	USE          = "use"
+	TRY          = "try"
+	CATCH        = "catch"
+	THROW        = "throw"
 )
 
 var keywords = map[string]TokenType{
@@ -140,6 +143,9 @@ var keywords = map[string]TokenType{
 	"require_once": REQUIRE_ONCE,
 	"namespace":    NAMESPACE,
 	"use":          USE,
+	"try":          TRY,
+	"catch":        CATCH,
+	"throw":        THROW,
 }
 
 func LookupIdent(ident string) TokenType {

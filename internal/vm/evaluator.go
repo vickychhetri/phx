@@ -1,9 +1,11 @@
 package vm
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"phx/internal/ast"
 	"phx/internal/token"
 	"phx/internal/lexer"
@@ -107,6 +109,40 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 		env.aliases[n.Alias.Literal] = n.Name.Literal
 		return NULL
 
+	case *ast.ThrowStatement:
+		val := Evaluate(n.Expression, env, out)
+		if isError(val) {
+			return val
+		}
+		return &ExceptionObject{Value: val}
+
+	case *ast.TryCatchStatement:
+		result := Evaluate(n.TryBlock, env, out)
+		if result != nil && result.Type() == EXCEPTION_OBJ {
+			exceptionObj := result.(*ExceptionObject).Value
+			resolvedCatchClass := env.ResolveName(n.CatchClass)
+			matches := false
+
+			if inst, ok := exceptionObj.(*ObjectInstance); ok {
+				if inst.Class.Name == resolvedCatchClass || strings.HasSuffix(inst.Class.Name, "\\"+resolvedCatchClass) {
+					matches = true
+				}
+			}
+
+			// Fallback match for Exception/PHX\Exception/PHX\Error
+			if !matches && (resolvedCatchClass == "Exception" || resolvedCatchClass == "PHX\\Exception" || resolvedCatchClass == "PHX\\Error") {
+				matches = true
+			}
+
+			if matches {
+				catchEnv := NewEnclosedEnvironment(env)
+				catchEnv.Set(n.CatchVar, exceptionObj)
+				return Evaluate(n.CatchBlock, catchEnv, out)
+			}
+			return result
+		}
+		return result
+
 	case *ast.WhileStatement:
 		for {
 			condition := Evaluate(n.Condition, env, out)
@@ -118,7 +154,7 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 			}
 			result := Evaluate(n.Body, env, out)
 			if result != nil {
-				if result.Type() == ERROR_OBJ || result.Type() == RETURN_VALUE_OBJ {
+				if result.Type() == ERROR_OBJ || result.Type() == RETURN_VALUE_OBJ || result.Type() == EXCEPTION_OBJ {
 					return result
 				}
 				if result.Type() == BREAK_OBJ {
@@ -135,7 +171,7 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 		for {
 			result := Evaluate(n.Body, env, out)
 			if result != nil {
-				if result.Type() == ERROR_OBJ || result.Type() == RETURN_VALUE_OBJ {
+				if result.Type() == ERROR_OBJ || result.Type() == RETURN_VALUE_OBJ || result.Type() == EXCEPTION_OBJ {
 					return result
 				}
 				if result.Type() == BREAK_OBJ {
@@ -174,7 +210,7 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 			}
 			result := Evaluate(n.Body, env, out)
 			if result != nil {
-				if result.Type() == ERROR_OBJ || result.Type() == RETURN_VALUE_OBJ {
+				if result.Type() == ERROR_OBJ || result.Type() == RETURN_VALUE_OBJ || result.Type() == EXCEPTION_OBJ {
 					return result
 				}
 				if result.Type() == BREAK_OBJ {
@@ -442,6 +478,46 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 			}
 			return &Channel{Ch: make(chan Object, capacity)}
 		}
+		if resolvedClass == "PHX\\File" || resolvedClass == "File" {
+			return &FileObject{}
+		}
+		if resolvedClass == "PHX\\Database" || resolvedClass == "PHX\\DB" || resolvedClass == "Database" || resolvedClass == "DB" {
+			return &DatabaseObject{}
+		}
+		if resolvedClass == "PHX\\MySQL" || resolvedClass == "MySQL" {
+			return &MySQLObject{}
+		}
+		if resolvedClass == "PHX\\PostgreSQL" || resolvedClass == "Postgres" || resolvedClass == "PostgreSQL" || resolvedClass == "PHX\\Postgres" {
+			return &PostgresObject{}
+		}
+		if resolvedClass == "PHX\\MongoDB" || resolvedClass == "Mongo" || resolvedClass == "MongoDB" || resolvedClass == "PHX\\Mongo" {
+			return &MongoObject{collections: make(map[string][]Object)}
+		}
+		if resolvedClass == "PHX\\Exception" || resolvedClass == "Exception" || resolvedClass == "PHX\\Error" || resolvedClass == "Error" {
+			msg := ""
+			var code int64 = 0
+			if len(n.Arguments) > 0 {
+				argVal := Evaluate(n.Arguments[0], env, out)
+				if isError(argVal) {
+					return argVal
+				}
+				msg = argVal.Inspect()
+				// strip quotes from inspect if it's a string representation
+				if strings.HasPrefix(msg, `"`) && strings.HasSuffix(msg, `"`) {
+					msg = msg[1 : len(msg)-1]
+				}
+			}
+			if len(n.Arguments) > 1 {
+				codeVal := Evaluate(n.Arguments[1], env, out)
+				if isError(codeVal) {
+					return codeVal
+				}
+				if intVal, ok := codeVal.(*Integer); ok {
+					code = intVal.Value
+				}
+			}
+			return &PHXExceptionObject{Message: msg, Code: code}
+		}
 		classObj, ok := env.Get(resolvedClass)
 		if !ok {
 			return newError("class not found: %s", n.Class.Value)
@@ -553,6 +629,496 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 			}
 		}
 
+		if fileObj, ok := objVal.(*FileObject); ok {
+			methodName := n.Method.Value
+			args := []Object{}
+			for _, arg := range n.Arguments {
+				val := Evaluate(arg, env, out)
+				if isError(val) {
+					return val
+				}
+				args = append(args, val)
+			}
+
+			switch methodName {
+			case "open":
+				if len(args) < 2 {
+					return newError("File::open expects 2 arguments: path and mode")
+				}
+				path := args[0].Inspect()
+				mode := args[1].Inspect()
+
+				// Strip quotes if they were string inspected
+				if strings.HasPrefix(path, `"`) && strings.HasSuffix(path, `"`) {
+					path = path[1 : len(path)-1]
+				}
+				if strings.HasPrefix(mode, `"`) && strings.HasSuffix(mode, `"`) {
+					mode = mode[1 : len(mode)-1]
+				}
+
+				var flag int
+				if strings.Contains(mode, "w") {
+					flag = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+				} else if strings.Contains(mode, "a") {
+					flag = os.O_WRONLY | os.O_CREATE | os.O_APPEND
+				} else {
+					flag = os.O_RDONLY
+				}
+
+				f, err := os.OpenFile(path, flag, 0666)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "failed to open file: " + err.Error()}}
+				}
+				fileObj.file = f
+				return TRUE
+
+			case "read":
+				if fileObj.file == nil {
+					return newError("file is not open")
+				}
+				if len(args) < 1 {
+					return newError("File::read expects 1 argument: length")
+				}
+				length, ok := args[0].(*Integer)
+				if !ok {
+					return newError("File::read first argument must be an integer")
+				}
+				buf := make([]byte, length.Value)
+				nBytes, err := fileObj.file.Read(buf)
+				if err != nil && err != io.EOF {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "failed to read file: " + err.Error()}}
+				}
+				return &String{Value: string(buf[:nBytes])}
+
+			case "readLine":
+				if fileObj.file == nil {
+					return newError("file is not open")
+				}
+				reader := bufio.NewReader(fileObj.file)
+				line, err := reader.ReadString('\n')
+				if err != nil && err != io.EOF {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "failed to read line: " + err.Error()}}
+				}
+				if line == "" && err == io.EOF {
+					return FALSE
+				}
+				return &String{Value: line}
+
+			case "write":
+				if fileObj.file == nil {
+					return newError("file is not open")
+				}
+				if len(args) < 1 {
+					return newError("File::write expects 1 argument: content")
+				}
+				content := args[0].Inspect()
+				if strings.HasPrefix(content, `"`) && strings.HasSuffix(content, `"`) {
+					content = content[1 : len(content)-1]
+				}
+				nBytes, err := fileObj.file.WriteString(content)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "failed to write file: " + err.Error()}}
+				}
+				return &Integer{Value: int64(nBytes)}
+
+			case "close":
+				if fileObj.file != nil {
+					fileObj.file.Close()
+					fileObj.file = nil
+				}
+				return TRUE
+
+			case "exists":
+				if len(args) < 1 {
+					return newError("File::exists expects 1 argument: path")
+				}
+				path := args[0].Inspect()
+				if strings.HasPrefix(path, `"`) && strings.HasSuffix(path, `"`) {
+					path = path[1 : len(path)-1]
+				}
+				_, err := os.Stat(path)
+				if err == nil {
+					return TRUE
+				}
+				return FALSE
+
+			case "delete":
+				if len(args) < 1 {
+					return newError("File::delete expects 1 argument: path")
+				}
+				path := args[0].Inspect()
+				if strings.HasPrefix(path, `"`) && strings.HasSuffix(path, `"`) {
+					path = path[1 : len(path)-1]
+				}
+				err := os.Remove(path)
+				if err != nil {
+					return FALSE
+				}
+				return TRUE
+
+			default:
+				return newError("undefined method: %s on File", methodName)
+			}
+		}
+
+		if dbObj, ok := objVal.(*DatabaseObject); ok {
+			methodName := n.Method.Value
+			args := []Object{}
+			for _, arg := range n.Arguments {
+				val := Evaluate(arg, env, out)
+				if isError(val) {
+					return val
+				}
+				args = append(args, val)
+			}
+
+			switch methodName {
+			case "open":
+				if len(args) < 1 {
+					return newError("Database::open expects 1 argument: dbPath")
+				}
+				dbPath := args[0].Inspect()
+				if strings.HasPrefix(dbPath, `"`) && strings.HasSuffix(dbPath, `"`) {
+					dbPath = dbPath[1 : len(dbPath)-1]
+				}
+				dbObj.path = dbPath
+				dbObj.data = make(map[string][]map[string]Object)
+
+				if _, err := os.Stat(dbPath); err == nil {
+					content, err := os.ReadFile(dbPath)
+					if err == nil {
+						dbObj.loadFromJSON(content)
+					}
+				}
+				return TRUE
+
+			case "exec":
+				if dbObj.data == nil {
+					return newError("database is not open")
+				}
+				if len(args) < 1 {
+					return newError("Database::exec expects 1 argument: sqlQuery")
+				}
+				query := args[0].Inspect()
+				if strings.HasPrefix(query, `"`) && strings.HasSuffix(query, `"`) {
+					query = query[1 : len(query)-1]
+				}
+				err := dbObj.executeExec(query)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "DB Exec Error: " + err.Error()}}
+				}
+				return TRUE
+
+			case "query":
+				if dbObj.data == nil {
+					return newError("database is not open")
+				}
+				if len(args) < 1 {
+					return newError("Database::query expects 1 argument: sqlQuery")
+				}
+				query := args[0].Inspect()
+				if strings.HasPrefix(query, `"`) && strings.HasSuffix(query, `"`) {
+					query = query[1 : len(query)-1]
+				}
+				res, err := dbObj.executeQuery(query)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "DB Query Error: " + err.Error()}}
+				}
+				return res
+
+			case "close":
+				dbObj.data = nil
+				dbObj.path = ""
+				return TRUE
+
+			default:
+				return newError("undefined method: %s on Database", methodName)
+			}
+		}
+
+		if myObj, ok := objVal.(*MySQLObject); ok {
+			methodName := n.Method.Value
+			args := []Object{}
+			for _, arg := range n.Arguments {
+				val := Evaluate(arg, env, out)
+				if isError(val) {
+					return val
+				}
+				args = append(args, val)
+			}
+
+			switch methodName {
+			case "connect":
+				if len(args) < 4 {
+					return newError("MySQL::connect expects 4 arguments: host, user, password, db")
+				}
+				host := strings.Trim(args[0].Inspect(), `"` + `'`)
+				user := strings.Trim(args[1].Inspect(), `"` + `'`)
+				password := strings.Trim(args[2].Inspect(), `"` + `'`)
+				db := strings.Trim(args[3].Inspect(), `"` + `'`)
+				err := myObj.connect(host, user, password, db)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "MySQL Connection Error: " + err.Error()}}
+				}
+				fmt.Printf("[MySQL] Connected to %s@%s db: %s\n", user, host, db)
+				return TRUE
+
+			case "exec":
+				if !myObj.connected {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "MySQL Error: Not connected"}}
+				}
+				if len(args) < 1 {
+					return newError("MySQL::exec expects 1 argument: sqlQuery")
+				}
+				query := args[0].Inspect()
+				query = strings.Trim(query, `"` + `'`)
+				err := myObj.executeExec(query)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "MySQL Exec Error: " + err.Error()}}
+				}
+				return TRUE
+
+			case "query":
+				if !myObj.connected {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "MySQL Error: Not connected"}}
+				}
+				if len(args) < 1 {
+					return newError("MySQL::query expects 1 argument: sqlQuery")
+				}
+				query := args[0].Inspect()
+				query = strings.Trim(query, `"` + `'`)
+				res, err := myObj.executeQuery(query)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "MySQL Query Error: " + err.Error()}}
+				}
+				return res
+
+			case "close":
+				myObj.close()
+				fmt.Println("[MySQL] Connection closed")
+				return TRUE
+
+			default:
+				return newError("undefined method: %s on MySQL", methodName)
+			}
+		}
+
+		if pgObj, ok := objVal.(*PostgresObject); ok {
+			methodName := n.Method.Value
+			args := []Object{}
+			for _, arg := range n.Arguments {
+				val := Evaluate(arg, env, out)
+				if isError(val) {
+					return val
+				}
+				args = append(args, val)
+			}
+
+			switch methodName {
+			case "connect":
+				if len(args) < 4 {
+					return newError("PostgreSQL::connect expects 4 arguments: host, user, password, db, [port]")
+				}
+				host := strings.Trim(args[0].Inspect(), `"` + `'`)
+				user := strings.Trim(args[1].Inspect(), `"` + `'`)
+				password := strings.Trim(args[2].Inspect(), `"` + `'`)
+				db := strings.Trim(args[3].Inspect(), `"` + `'`)
+
+				var port int64 = 5432
+				if len(args) > 4 {
+					if intVal, ok := args[4].(*Integer); ok {
+						port = intVal.Value
+					}
+				}
+				err := pgObj.connect(host, user, password, db, port)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "PostgreSQL Connection Error: " + err.Error()}}
+				}
+				fmt.Printf("[PostgreSQL] Connected to %s@%s:%d db: %s\n", user, host, port, db)
+				return TRUE
+
+			case "exec":
+				if !pgObj.connected {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "PostgreSQL Error: Not connected"}}
+				}
+				if len(args) < 1 {
+					return newError("PostgreSQL::exec expects 1 argument: sqlQuery")
+				}
+				query := args[0].Inspect()
+				query = strings.Trim(query, `"` + `'`)
+				err := pgObj.executeExec(query)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "PostgreSQL Exec Error: " + err.Error()}}
+				}
+				return TRUE
+
+			case "query":
+				if !pgObj.connected {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "PostgreSQL Error: Not connected"}}
+				}
+				if len(args) < 1 {
+					return newError("PostgreSQL::query expects 1 argument: sqlQuery")
+				}
+				query := args[0].Inspect()
+				query = strings.Trim(query, `"` + `'`)
+				res, err := pgObj.executeQuery(query)
+				if err != nil {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "PostgreSQL Query Error: " + err.Error()}}
+				}
+				return res
+
+			case "close":
+				pgObj.close()
+				fmt.Println("[PostgreSQL] Connection closed")
+				return TRUE
+
+			default:
+				return newError("undefined method: %s on PostgreSQL", methodName)
+			}
+		}
+
+		if mgObj, ok := objVal.(*MongoObject); ok {
+			methodName := n.Method.Value
+			args := []Object{}
+			for _, arg := range n.Arguments {
+				val := Evaluate(arg, env, out)
+				if isError(val) {
+					return val
+				}
+				args = append(args, val)
+			}
+
+			switch methodName {
+			case "connect":
+				if len(args) < 1 {
+					return newError("MongoDB::connect expects 1 argument: uri")
+				}
+				mgObj.uri = args[0].Inspect()
+				mgObj.uri = strings.Trim(mgObj.uri, `"` + `'`)
+				mgObj.connected = true
+				fmt.Printf("[MongoDB] Connected to %s\n", mgObj.uri)
+				return TRUE
+
+			case "selectDatabase":
+				if !mgObj.connected {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "MongoDB Error: Not connected"}}
+				}
+				if len(args) < 1 {
+					return newError("MongoDB::selectDatabase expects 1 argument: dbName")
+				}
+				mgObj.dbName = args[0].Inspect()
+				mgObj.dbName = strings.Trim(mgObj.dbName, `"` + `'`)
+				return TRUE
+
+			case "selectCollection":
+				if !mgObj.connected {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "MongoDB Error: Not connected"}}
+				}
+				if len(args) < 1 {
+					return newError("MongoDB::selectCollection expects 1 argument: collectionName")
+				}
+				mgObj.collName = args[0].Inspect()
+				mgObj.collName = strings.Trim(mgObj.collName, `"` + `'`)
+				return TRUE
+
+			case "insertOne":
+				if !mgObj.connected {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "MongoDB Error: Not connected"}}
+				}
+				if len(args) < 1 {
+					return newError("MongoDB::insertOne expects 1 argument: document")
+				}
+				doc := args[0]
+				if mgObj.collections == nil {
+					mgObj.collections = make(map[string][]Object)
+				}
+				mgObj.collections[mgObj.collName] = append(mgObj.collections[mgObj.collName], doc)
+				return TRUE
+
+			case "find":
+				if !mgObj.connected {
+					return &ExceptionObject{Value: &PHXExceptionObject{Message: "MongoDB Error: Not connected"}}
+				}
+				filter := Object(nil)
+				if len(args) > 0 {
+					filter = args[0]
+				}
+
+				docs, ok := mgObj.collections[mgObj.collName]
+				if !ok {
+					return &Array{Pairs: []*ArrayPair{}}
+				}
+
+				results := []*ArrayPair{}
+				idx := int64(0)
+
+				for _, doc := range docs {
+					matches := true
+					if filterArr, isArr := filter.(*Array); isArr && filter != nil {
+						for _, filterPair := range filterArr.Pairs {
+							filterKey := filterPair.Key.Inspect()
+							filterKey = strings.Trim(filterKey, `"` + `'` + `[` + `]`)
+							filterVal := filterPair.Value.Inspect()
+							filterVal = strings.Trim(filterVal, `"` + `'`)
+
+							if docArr, docIsArr := doc.(*Array); docIsArr {
+								fieldMatched := false
+								for _, docPair := range docArr.Pairs {
+									docKey := docPair.Key.Inspect()
+									docKey = strings.Trim(docKey, `"` + `'` + `[` + `]`)
+									if docKey == filterKey {
+										docVal := docPair.Value.Inspect()
+										docVal = strings.Trim(docVal, `"` + `'`)
+										if docVal == filterVal {
+											fieldMatched = true
+											break
+										}
+									}
+								}
+								if !fieldMatched {
+									matches = false
+									break
+								}
+							} else {
+								matches = false
+								break
+							}
+						}
+					}
+
+					if matches {
+						results = append(results, &ArrayPair{
+							Key:   &Integer{Value: idx},
+							Value: doc,
+						})
+						idx++
+					}
+				}
+
+				return &Array{Pairs: results}
+
+			case "close":
+				mgObj.connected = false
+				fmt.Println("[MongoDB] Connection closed")
+				return TRUE
+
+			default:
+				return newError("undefined method: %s on MongoDB", methodName)
+			}
+		}
+
+		if exObj, ok := objVal.(*PHXExceptionObject); ok {
+			methodName := n.Method.Value
+			switch methodName {
+			case "getMessage":
+				return &String{Value: exObj.Message}
+			case "getCode":
+				return &Integer{Value: exObj.Code}
+			default:
+				return newError("undefined method: %s on Exception", methodName)
+			}
+		}
+
 		instance, ok := objVal.(*ObjectInstance)
 		if !ok {
 			return newError("cannot call method on non-object: %s", n.Object.String())
@@ -639,7 +1205,7 @@ func evalProgram(statements []ast.Statement, env *Environment, out io.Writer) Ob
 			if result.Type() == RETURN_VALUE_OBJ {
 				return result.(*ReturnValue).Value
 			}
-			if result.Type() == ERROR_OBJ {
+			if result.Type() == ERROR_OBJ || result.Type() == EXCEPTION_OBJ {
 				return result
 			}
 			if result.Type() == BREAK_OBJ || result.Type() == CONTINUE_OBJ {
@@ -655,7 +1221,7 @@ func evalBlockStatement(statements []ast.Statement, env *Environment, out io.Wri
 	for _, statement := range statements {
 		result = Evaluate(statement, env, out)
 		if result != nil {
-			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ {
+			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == EXCEPTION_OBJ {
 				return result
 			}
 			if result.Type() == BREAK_OBJ || result.Type() == CONTINUE_OBJ {
@@ -942,7 +1508,7 @@ func newError(format string, a ...interface{}) *Error {
 
 func isError(obj Object) bool {
 	if obj != nil {
-		return obj.Type() == ERROR_OBJ
+		return obj.Type() == ERROR_OBJ || obj.Type() == EXCEPTION_OBJ
 	}
 	return false
 }

@@ -640,3 +640,38 @@ func (ie *IndexExpression) String() string {
 	out.WriteString("])")
 	return out.String()
 }
+
+type ThrowStatement struct {
+	Token      token.Token // 'throw'
+	Expression Expression
+}
+
+func (ts *ThrowStatement) statementNode()       {}
+func (ts *ThrowStatement) TokenLiteral() string { return ts.Token.Literal }
+func (ts *ThrowStatement) String() string {
+	return "throw " + ts.Expression.String() + ";"
+}
+
+type TryCatchStatement struct {
+	Token      token.Token // 'try'
+	TryBlock   *BlockStatement
+	CatchClass string
+	CatchVar   string
+	CatchBlock *BlockStatement
+}
+
+func (tcs *TryCatchStatement) statementNode()       {}
+func (tcs *TryCatchStatement) TokenLiteral() string { return tcs.Token.Literal }
+func (tcs *TryCatchStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString("try ")
+	out.WriteString(tcs.TryBlock.String())
+	out.WriteString(" catch (")
+	out.WriteString(tcs.CatchClass)
+	out.WriteString(" ")
+	out.WriteString(tcs.CatchVar)
+	out.WriteString(") ")
+	out.WriteString(tcs.CatchBlock.String())
+	return out.String()
+}
+

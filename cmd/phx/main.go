@@ -38,6 +38,10 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Runtime Error: %s\n", errObj.Message)
 			os.Exit(1)
 		}
+		if result != nil && result.Type() == "EXCEPTION" {
+			fmt.Fprintf(os.Stderr, "Uncaught Exception: %s\n", result.Inspect())
+			os.Exit(1)
+		}
 		return
 	}
 
@@ -164,6 +168,10 @@ func runInterpreter(filePath string) {
 	result := vm.Evaluate(program, env, os.Stdout)
 	if errObj, ok := result.(*vm.Error); ok {
 		fmt.Fprintf(os.Stderr, "Runtime Error: %s\n", errObj.Message)
+		os.Exit(1)
+	}
+	if result != nil && result.Type() == "EXCEPTION" {
+		fmt.Fprintf(os.Stderr, "Uncaught Exception: %s\n", result.Inspect())
 		os.Exit(1)
 	}
 }
@@ -427,6 +435,10 @@ func runBuild(mainFilePath string, outputBinary string) {
 	result := vm.Evaluate(program, env, os.Stdout)
 	if errObj, ok := result.(*vm.Error); ok {
 		fmt.Fprintf(os.Stderr, "Runtime Error: %s\n", errObj.Message)
+		os.Exit(1)
+	}
+	if result != nil && result.Type() == "EXCEPTION" {
+		fmt.Fprintf(os.Stderr, "Uncaught Exception: %s\n", result.Inspect())
 		os.Exit(1)
 	}
 }

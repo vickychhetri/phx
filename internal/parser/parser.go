@@ -187,6 +187,10 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseNamespaceStatement()
 	case token.USE:
 		return p.parseUseStatement()
+	case token.TRY:
+		return p.parseTryCatchStatement()
+	case token.THROW:
+		return p.parseThrowStatement()
 	case token.PUBLIC, token.PRIVATE, token.PROTECTED:
 		p.nextToken() // consume visibility modifier
 		if p.curTokenIs(token.FUNCTION) {
@@ -1063,3 +1067,54 @@ func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	return exp
 }
 
+func (p *Parser) parseThrowStatement() *ast.ThrowStatement {
+	stmt := &ast.ThrowStatement{Token: p.curToken}
+	p.nextToken() // consume 'throw'
+
+	stmt.Expression = p.parseExpression(LOWEST)
+
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+	return stmt
+}
+
+func (p *Parser) parseTryCatchStatement() *ast.TryCatchStatement {
+	stmt := &ast.TryCatchStatement{Token: p.curToken}
+
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	stmt.TryBlock = p.parseBlockStatement()
+
+	if !p.expectPeek(token.CATCH) {
+		return nil
+	}
+
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	if !p.expectPeek(token.T_IDENTIFIER) {
+		return nil
+	}
+	stmt.CatchClass = p.curToken.Literal
+
+	if !p.expectPeek(token.T_VARIABLE) {
+		return nil
+	}
+	stmt.CatchVar = p.curToken.Literal
+
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	stmt.CatchBlock = p.parseBlockStatement()
+
+	return stmt
+}
