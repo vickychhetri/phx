@@ -692,6 +692,11 @@ func (p *Parser) parseCallExpression(left ast.Expression) ast.Expression {
 
 func (p *Parser) parseObjectAccessExpression(left ast.Expression) ast.Expression {
 	tok := p.curToken // '->'
+	if p.peekToken.Type != token.T_IDENTIFIER {
+		if token.LookupIdent(p.peekToken.Literal) != token.T_IDENTIFIER {
+			p.peekToken.Type = token.T_IDENTIFIER
+		}
+	}
 	if !p.expectPeek(token.T_IDENTIFIER) {
 		return nil
 	}

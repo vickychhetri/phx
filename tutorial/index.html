@@ -3,389 +3,1334 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PHX Language Tutorial</title>
+    <title>PHX Developer Guide & Runtime Reference</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: Georgia, serif;
-            color: #000000;
-            background-color: #ffffff;
-            line-height: 1.6;
-            margin: 40px auto;
-            max-width: 760px;
-            padding: 0 20px;
+        :root {
+            --bg-color: #030712;
+            --sidebar-bg: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.06);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-grad: linear-gradient(135deg, #a78bfa, #f472b6);
+            --code-bg: #090d16;
+            --code-border: rgba(139, 92, 246, 0.15);
+            --highlight: #1e1b4b;
         }
 
-        h1, h2, h3 {
-            font-family: monospace;
-            font-weight: bold;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            display: flex;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-purple);
+        }
+
+        /* Sidebar navigation */
+        aside {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 30px 20px;
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 35px;
+            padding-left: 10px;
+        }
+
+        .logo-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .logo-sub {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-left: 8px;
+            border: 1px solid var(--accent-purple);
+            padding: 1px 6px;
+            border-radius: 4px;
             text-transform: uppercase;
-            border-bottom: 2px solid #000000;
-            padding-bottom: 5px;
-            margin-top: 40px;
+            letter-spacing: 1px;
+        }
+
+        .nav-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 15px;
+            padding-left: 10px;
+        }
+
+        aside ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        aside a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 10px 14px;
+            border-radius: 8px;
+            display: block;
+            transition: all 0.2s ease-in-out;
+            border-left: 3px solid transparent;
+        }
+
+        aside a:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        aside li.active a, aside a.active {
+            color: #ffffff;
+            background: rgba(139, 92, 246, 0.1);
+            border-left-color: var(--accent-purple);
+        }
+
+        /* Main Content area */
+        main {
+            margin-left: 280px;
+            flex-grow: 1;
+            padding: 50px 80px;
+            max-width: 1100px;
+            position: relative;
+        }
+
+        header {
+            margin-bottom: 50px;
+            position: relative;
         }
 
         h1 {
-            font-size: 2.2rem;
-            margin-bottom: 30px;
-            border-bottom: 4px solid #000000;
+            font-size: 2.8rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin-bottom: 10px;
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-desc {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+        }
+
+        /* Section layout */
+        section {
+            margin-bottom: 60px;
+            scroll-margin-top: 40px;
+        }
+
+        .section-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .section-card:hover {
+            border-color: rgba(139, 92, 246, 0.2);
         }
 
         h2 {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 24px;
+            background: var(--accent-grad);
+            border-radius: 2px;
         }
 
         h3 {
-            font-size: 1.1rem;
-            border-bottom: 1px dashed #000000;
-        }
-
-        pre, code {
-            font-family: "Courier New", Courier, monospace;
-            background-color: #ffffff;
-            color: #000000;
-        }
-
-        pre {
-            border: 1px solid #000000;
-            padding: 15px;
-            overflow-x: auto;
-            margin: 20px 0;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        code {
-            border: 1px dashed #cccccc;
-            padding: 2px 4px;
-        }
-
-        ul {
-            list-style-type: square;
-            padding-left: 20px;
-        }
-
-        li {
-            margin-bottom: 8px;
-        }
-
-        a {
-            color: #000000;
-            text-decoration: underline;
-        }
-
-        a:hover {
-            background-color: #000000;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 30px;
+            margin-bottom: 12px;
             color: #ffffff;
         }
 
-        nav {
-            border: 1px solid #000000;
-            padding: 15px;
-            margin-bottom: 40px;
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            font-size: 0.975rem;
         }
 
-        nav ul {
-            list-style-type: none;
+        /* Lists */
+        ul.square-list {
+            list-style: none;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        ul.square-list li {
+            position: relative;
+            padding-left: 20px;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        ul.square-list li::before {
+            content: "▪";
+            position: absolute;
+            left: 0;
+            color: var(--accent-purple);
+            font-size: 1.1rem;
+            top: -2px;
+        }
+
+        /* Code Block formatting */
+        pre {
+            background-color: var(--code-bg);
+            border: 1px solid var(--code-border);
+            border-radius: 10px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Inline code */
+        p code, li code {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: var(--accent-pink);
+            font-size: 0.85em;
+        }
+
+        .highlight-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            bottom: 0;
+            background: var(--accent-grad);
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+        }
+
+        /* API Reference Table */
+        .api-table-container {
+            overflow-x: auto;
+            margin-top: 25px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+
+        table.api-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        table.api-table th {
+            background-color: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 18px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        table.api-table td {
+            border-bottom: 1px solid var(--border-color);
+            padding: 14px 18px;
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        table.api-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        table.api-table code {
+            color: var(--accent-purple);
+            font-weight: 500;
+            background: none;
+            border: none;
             padding: 0;
-            margin: 0;
         }
 
-        nav li {
+        /* Badges */
+        .badge {
             display: inline-block;
-            margin-right: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .section-separator {
-            border-top: 1px solid #000000;
-            margin: 50px 0;
+        .badge-chain {
+            background-color: rgba(236, 72, 153, 0.15);
+            color: var(--accent-pink);
+            border: 1px solid rgba(236, 72, 153, 0.3);
+        }
+
+        .badge-block {
+            background-color: rgba(139, 92, 246, 0.15);
+            color: var(--accent-purple);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        /* Responsive layout */
+        @media (max-width: 900px) {
+            body {
+                flex-direction: column;
+            }
+            aside {
+                width: 100%;
+                position: static;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                padding: 20px;
+            }
+            main {
+                margin-left: 0;
+                padding: 40px 20px;
+            }
         }
     </style>
 </head>
 <body>
 
-    <h1>PHX Language Tutorial</h1>
-    <p>Welcome to the PHX language tutorial. This document describes the syntax, features, and execution mechanisms supported by the PHX compiler.</p>
-
-    <nav>
-        <strong>TABLE OF CONTENTS</strong>
+    <aside>
+        <div class="logo-container">
+            <div class="logo-text">PHX</div>
+            <div class="logo-sub">docs</div>
+        </div>
+        <div class="nav-title">Developer Guide</div>
         <ul>
             <li><a href="#basics">1. Basics & Output</a></li>
             <li><a href="#control-flow">2. Control Flow</a></li>
             <li><a href="#loops">3. Loops</a></li>
-            <li><a href="#functions">4. Functions & Closures</a></li>
+            <li><a href="#functions">4. Functions & Scope</a></li>
             <li><a href="#oop">5. Classes & OOP</a></li>
             <li><a href="#exceptions">6. Exceptions</a></li>
             <li><a href="#file-io">7. File Operations</a></li>
             <li><a href="#concurrency">8. Concurrency & Channels</a></li>
-            <li><a href="#compiler">9. Compiler CLI</a></li>
+            <li><a href="#http-server">9. High-Performance HTTP</a></li>
+            <li><a href="#compiler">10. Compiler CLI</a></li>
         </ul>
-    </nav>
+        <div class="nav-title">Tutorial</div>
+        <ul>
+            <li><a href="getting_started.html" style="color: #a78bfa;">🚀 Getting Started Tutorial</a></li>
+        </ul>
+    </aside>
 
-    <!-- SECTION 1 -->
-    <section id="basics">
-        <h2>1. Basics & Output</h2>
-        <p>PHX uses a syntax derived from PHP. Programs must start with the standard <code>&lt;?php</code> tag. Comments are supported using <code>//</code> for single lines.</p>
+    <main>
+        <header>
+            <h1>PHX Developer Guide</h1>
+            <p class="header-desc">Welcome to the complete language and runtime reference for PHX. Build native, high-performance, and concurrent cloud-ready systems using a familiar PHP syntax compiled directly to Go binaries.</p>
+        </header>
 
-        <h3>Variable Declaration & Types</h3>
-        <p>Variables are dynamically typed and prefixed with a <code>$</code> character. Supported basic types include Integers, Floats, Booleans, Strings, Arrays, and Null.</p>
-        <pre>&lt;?php
-$name = "Vicky";      // String
-$age = 25;            // Integer
-$pi = 3.14159;        // Float
-$isCompilerDeveloper = true; // Boolean
-$noValue = null;      // Null
-?&gt;</pre>
+        <!-- SECTION 1 -->
+        <section id="basics">
+            <div class="section-card">
+                <h2>1. Basics & Output</h2>
+                <p>PHX features a modern PHP 8+ style syntax compiled directly into native Go machine instructions. Every file must begin with the <code>&lt;?php</code> tag. Comments are supported via standard double-slashes <code>//</code> for single lines.</p>
 
-        <h3>Standard Output</h3>
-        <p>To print output to the console, use the <code>echo</code> statement or the <code>print_r()</code> function for arrays.</p>
-        <pre>&lt;?php
-echo "Hello, PHX!\n";
-echo "Name: " . $name . "\n"; // Concatenation using '.'
-?&gt;</pre>
-    </section>
+                <h3>Variable Declaration & Rules</h3>
+                <p>Variables in PHX are dynamically typed, prefixed with the <code>$</code> character, and initialized upon assignment. Variable names are case-sensitive and must start with a letter or underscore.</p>
+                
+                <h3>Basic Data Types</h3>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Data Type</th>
+                                <th>Example Syntax</th>
+                                <th>Meaning & Representation</th>
+                                <th>Primary Use Case Scenario</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Integer</strong></td>
+                                <td><code>$port = 8085;</code></td>
+                                <td>64-bit signed whole numbers.</td>
+                                <td>Loop iterators, array offsets, status codes.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Float</strong></td>
+                                <td><code>$duration = 1.45;</code></td>
+                                <td>64-bit double precision float numbers.</td>
+                                <td>Precise metric logging, calculation multipliers.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>String</strong></td>
+                                <td><code>$name = "Vicky";</code></td>
+                                <td>UTF-8 character sequences inside double quotes. Supports escape sequences like <code>\n</code>.</td>
+                                <td>Display text, payload templates, database keys.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Boolean</strong></td>
+                                <td><code>$isActive = true;</code></td>
+                                <td>Logical values (<code>true</code> or <code>false</code>).</td>
+                                <td>Feature flags, request filters, completed flags.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Array</strong></td>
+                                <td><code>$items = [1, "two", false];</code></td>
+                                <td>Ordered lists of items. Supports associative key-value mappings.</td>
+                                <td>Record lists, request parameters, database rows.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Null</strong></td>
+                                <td><code>$data = null;</code></td>
+                                <td>Represents the absolute absence of a value.</td>
+                                <td>Default values, resetting variables, checking unset attributes.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-    <div class="section-separator"></div>
+                <h3>Standard Output & Concatenation</h3>
+                <p>Use the <code>echo</code> keyword to print messages directly to the standard output. Strings and variables are concatenated using the dot operator (<code>.</code>).</p>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$name = "Vicky";
+$role = "Systems Engineer";
 
-    <!-- SECTION 2 -->
-    <section id="control-flow">
-        <h2>2. Control Flow</h2>
-        <p>PHX supports standard conditional branching constructs.</p>
+// Concatenating string literal with variables
+echo "User: " . $name . " operates as " . $role . "\n";
+?></code></pre>
+            </div>
+        </section>
 
-        <h3>If / Else If / Else</h3>
-        <pre>&lt;?php
-$score = 85;
+        <!-- SECTION 2 -->
+        <section id="control-flow">
+            <div class="section-card">
+                <h2>2. Control Flow</h2>
+                <p>Control flow enables branching execution paths in your application based on logical evaluations.</p>
 
-if ($score >= 90) {
-    echo "Grade: A\n";
-} else if ($score >= 80) {
-    echo "Grade: B\n";
+                <h3>Conditionals (If / Else If / Else)</h3>
+                <p>Conditional blocks evaluate expressions to truthy or falsy states. Below is the syntax, comparison operators, and logic operations:</p>
+                
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Operator</th>
+                                <th>Meaning</th>
+                                <th>Syntax Example</th>
+                                <th>Strictness Behavior</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>==</code></td>
+                                <td>Loose Equality</td>
+                                <td><code>$a == $b</code></td>
+                                <td>Compares values after type-coercion (e.g. <code>"1" == 1</code> is true).</td>
+                            </tr>
+                            <tr>
+                                <td><code>===</code></td>
+                                <td>Strict Equality</td>
+                                <td><code>$a === $b</code></td>
+                                <td>Compares both value and type (e.g. <code>"1" === 1</code> is false).</td>
+                            </tr>
+                            <tr>
+                                <td><code>!=</code></td>
+                                <td>Loose Inequality</td>
+                                <td><code>$a != $b</code></td>
+                                <td>True if values are not equal after coercion.</td>
+                            </tr>
+                            <tr>
+                                <td><code>!==</code></td>
+                                <td>Strict Inequality</td>
+                                <td><code>$a !== $b</code></td>
+                                <td>True if values or types differ.</td>
+                            </tr>
+                            <tr>
+                                <td><code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code></td>
+                                <td>Comparison</td>
+                                <td><code>$a &lt;= $b</code></td>
+                                <td>Relational order comparisons.</td>
+                            </tr>
+                            <tr>
+                                <td><code>&amp;&amp;</code>, <code>||</code>, <code>!</code></td>
+                                <td>Logical Operators</td>
+                                <td><code>$a &amp;&amp; !$b</code></td>
+                                <td>Logical AND, OR, and Negation.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Example: Routing Guard Check</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$auth = "Bearer Token123";
+$role = "admin";
+
+if ($auth === "Bearer Token123" &amp;&amp; $role === "admin") {
+    echo "Access granted to admin panel.\n";
+} else if ($auth === "Bearer Token123") {
+    echo "Access limited to user dashboard.\n";
 } else {
-    echo "Grade: C\n";
+    echo "Access denied: Unauthorized.\n";
 }
-?&gt;</pre>
+?></code></pre>
 
-        <h3>Switch Statement</h3>
-        <p>The <code>switch</code> statement matches a value sequentially against several case blocks.</p>
-        <pre>&lt;?php
-$day = 3;
-switch ($day) {
-    case 1:
-        echo "Monday\n";
+                <h3>Switch Match Statements</h3>
+                <p>Evaluate a value sequentially against multiple matching expressions. Supports strict matching and a fallback <code>default</code> option.</p>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$status = 404;
+
+switch ($status) {
+    case 200:
+        echo "OK - Request successful.\n";
         break;
-    case 2:
-        echo "Tuesday\n";
+    case 404:
+        echo "Not Found - Endpoint does not exist.\n";
         break;
-    case 3:
-        echo "Wednesday\n";
+    case 500:
+        echo "Internal Error - Server failure.\n";
         break;
     default:
-        echo "Unknown day\n";
+        echo "Unknown HTTP status code.\n";
         break;
 }
-?&gt;</pre>
+?></code></pre>
+            </div>
+        </section>
 
-        <h3>Ternary Operators</h3>
-        <pre>&lt;?php
-$status = ($score >= 50) ? "Pass" : "Fail";
-echo $status . "\n";
-?&gt;</pre>
-    </section>
+        <!-- SECTION 3 -->
+        <section id="loops">
+            <div class="section-card">
+                <h2>3. Loops</h2>
+                <p>Loops execute statements repeatedly while a condition remains true. Loop control keywords <code>break</code> (exit immediately) and <code>continue</code> (skip to next iteration evaluation) are supported.</p>
 
-    <div class="section-separator"></div>
+                <h3>While Loops</h3>
+                <p>Evaluates the condition before running the iteration block. Ideal when the total iterations are not known beforehand.</p>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$ch = channel(5);
+send($ch, "Job A");
+send($ch, "Job B");
+send($ch, "stop");
 
-    <!-- SECTION 3 -->
-    <section id="loops">
-        <h2>3. Loops</h2>
-        <p>Loops run block statements repeatedly based on conditions.</p>
-
-        <h3>While & Do-While</h3>
-        <pre>&lt;?php
-$i = 1;
-while ($i <= 5) {
-    echo $i . "\n";
-    $i++;
+// Process items until "stop" token is received
+while (true) {
+    $item = receive($ch);
+    if ($item === "stop") {
+        break; // Exit the loop instantly
+    }
+    echo "Processing: " . $item . "\n";
 }
+?></code></pre>
 
-$x = 1;
+                <h3>Do-While Loops</h3>
+                <p>Executes the iteration block at least once before checking the condition. Useful for retry attempts.</p>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$retryCount = 0;
 do {
-    echo $x . "\n";
-    $x++;
-} while ($x <= 5);
-?&gt;</pre>
+    echo "Attempting to sync database pool...\n";
+    $retryCount++;
+} while ($retryCount &lt; 3);
+?></code></pre>
 
-        <h3>For Loops</h3>
-        <pre>&lt;?php
-for ($i = 0; $i < 5; $i++) {
-    echo "Iteration " . $i . "\n";
+                <h3>For Loops</h3>
+                <p>Standard counter iteration loops comprising an initializer, a condition check, and a step operation. Ideal for processing array data.</p>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$todos = [
+    ["id" => 1, "title" => "Deploy server"],
+    ["id" => 2, "title" => "Run tests"]
+];
+
+for ($i = 0; $i &lt; count($todos); $i++) {
+    $t = $todos[$i];
+    echo "Todo " . $t["id"] . ": " . $t["title"] . "\n";
 }
-?&gt;</pre>
+?></code></pre>
+            </div>
+        </section>
 
-        <h3>Array Iteration (Foreach equivalent)</h3>
-        <p>Iterate indexed or associative arrays using the <code>for</code> syntax key-value matching.</p>
-        <pre>&lt;?php
-$fruits = array("Apple", "Banana", "Cherry");
-for ($i = 0; $i < count($fruits); $i++) {
-    echo $fruits[$i] . "\n";
+        <!-- SECTION 4 -->
+        <section id="functions">
+            <div class="section-card">
+                <h2>4. Functions & Closures</h2>
+                <p>Functions isolate and modularize code. Arguments are passed by value and can return dynamic types.</p>
+
+                <h3>Defining Custom Functions</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+function formatResult($code, $message) {
+    return "[" . $code . "] Response: " . $message;
 }
-?&gt;</pre>
-    </section>
 
-    <div class="section-separator"></div>
+echo formatResult(200, "Success") . "\n";
+?></code></pre>
 
-    <!-- SECTION 4 -->
-    <section id="functions">
-        <h2>4. Functions & Closures</h2>
-        <p>Functions isolate computational logic. They can accept arguments and return values.</p>
-
-        <h3>Custom Functions</h3>
-        <pre>&lt;?php
-function add($a, $b) {
-    return $a + b;
-}
-echo add(5, 10) . "\n";
-?&gt;</pre>
-
-        <h3>Closures & Variable Scope Binding</h3>
-        <p>Closures are anonymous functions. PHX supports PHP-style explicit environment capture using the <code>use</code> keyword.</p>
-        <pre>&lt;?php
-$base = 100;
-$multiplier = function($val) use ($base) {
-    return $val * $base;
+                <h3>Closures & Environment Capture (use keyword)</h3>
+                <p>Closures are anonymous, callable function variables. To access variables from the outer scope, you must capture them explicitly using the <code>use</code> keyword, which copies the variable value into the closure's scope.</p>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$prefix = "LOG_EVENT";
+$logger = function($msg) use ($prefix) {
+    echo $prefix . ": " . $msg . "\n";
 };
-echo $multiplier(5) . "\n"; // Output: 500
-?&gt;</pre>
-    </section>
 
-    <div class="section-separator"></div>
+$logger("User logged in successfully"); // Output: LOG_EVENT: User logged in successfully
+?></code></pre>
+            </div>
+        </section>
 
-    <!-- SECTION 5 -->
-    <section id="oop">
-        <h2>5. Classes & Object-Oriented Programming (OOP)</h2>
-        <p>PHX supports basic class structures, inheritance, encapsulation, and class instantiation.</p>
+        <!-- SECTION 5 -->
+        <section id="oop">
+            <div class="section-card">
+                <h2>5. Classes & Object-Oriented Programming (OOP)</h2>
+                <p>PHX translates classes and inheritance directly to Go objects and closures, delivering object-oriented capabilities at compiler level.</p>
 
-        <h3>Class Definition & Inheritance</h3>
-        <pre>&lt;?php
-class Animal {
+                <h3>Syntax Definition</h3>
+                <p>Classes declare fields (prefixed with access levels like <code>public</code>) and methods. Use <code>$this-&gt;</code> to reference properties or invoke methods belonging to the instance.</p>
+                
+                <h3>Constructor & Instantiation</h3>
+                <p>The constructor method must be named <code>__construct</code>. Instantiate classes using the <code>new</code> keyword.</p>
+
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+class Service {
     public $name;
+    public $active;
 
     public function __construct($name) {
         $this->name = $name;
+        $this->active = true;
     }
 
-    public function speak() {
-        return "Generic Sound";
-    }
-}
-
-class Dog extends Animal {
-    public function speak() {
-        return "Woof";
+    public function status() {
+        if ($this->active) {
+            return $this->name . " is active";
+        }
+        return $this->name . " is offline";
     }
 }
 
-$dog = new Dog("Rex");
-echo $dog->name . " says " . $dog->speak() . "\n";
-?&gt;</pre>
-    </section>
+class Microservice extends Service {
+    public $port;
 
-    <div class="section-separator"></div>
+    public function __construct($name, $port) {
+        $this->name = $name;
+        $this->port = $port;
+        $this->active = true;
+    }
 
-    <!-- SECTION 6 -->
-    <section id="exceptions">
-        <h2>6. Exceptions</h2>
-        <p>PHX translates throwing and catching exceptions directly to native panic/recovery blocks in Go.</p>
+    public function status() {
+        return $this->name . " is running on port " . $this->port;
+    }
+}
 
-        <h3>Try-Catch Blocks</h3>
-        <pre>&lt;?php
+$api = new Microservice("AuthService", 8081);
+echo $api->status() . "\n"; // Output: AuthService is running on port 8081
+?></code></pre>
+            </div>
+        </section>
+
+        <!-- SECTION 6 -->
+        <section id="exceptions">
+            <div class="section-card">
+                <h2>6. Exceptions</h2>
+                <p>PHX maps try-catch blocks and throw statements directly to Go's panic-recover runtime. If an exception remains uncaught, it outputs a clean, PHP-style fatal error message to Stderr instead of a raw Go panic trace.</p>
+
+                <h3>Syntax & Execution</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
 try {
-    throw new Exception("Something went wrong");
+    echo "Running critical logic...\n";
+    throw new Exception("MySQL Database Connection Failed");
 } catch (Exception $e) {
-    echo "Caught exception: " . $e->getMessage() . "\n";
+    echo "Handled error gracefully: " . $e->getMessage() . "\n";
 }
-?&gt;</pre>
-    </section>
+?></code></pre>
+            </div>
+        </section>
 
-    <div class="section-separator"></div>
+        <!-- SECTION 7 -->
+        <section id="file-io">
+            <div class="section-card">
+                <h2>7. File Operations</h2>
+                <p>File inputs and outputs are managed through the built-in <code>File</code> class, bridging PHP operations to Go's <code>os</code> and <code>bufio</code> utilities.</p>
 
-    <!-- SECTION 7 -->
-    <section id="file-io">
-        <h2>7. File Operations</h2>
-        <p>Files are read and written using the built-in <code>File</code> class.</p>
+                <h3>Class: <code>File</code> Methods Reference</h3>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Arguments</th>
+                                <th>Returns</th>
+                                <th>Description / Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>open(string $path, string $mode)</code></td>
+                                <td><code>$path</code> (file path), <code>$mode</code> (<code>"r"</code>: read, <code>"w"</code>: write, <code>"a"</code>: append)</td>
+                                <td><code>bool</code></td>
+                                <td>Opens the file. Throws exception if path or permissions are invalid.</td>
+                            </tr>
+                            <tr>
+                                <td><code>write(string $content)</code></td>
+                                <td><code>$content</code> (string payload)</td>
+                                <td><code>bool</code></td>
+                                <td>Writes the contents to the file. Requires file opened in write/append modes.</td>
+                            </tr>
+                            <tr>
+                                <td><code>readLines()</code></td>
+                                <td>None</td>
+                                <td><code>array</code></td>
+                                <td>Reads the entire file contents and returns an array of strings representing each line.</td>
+                            </tr>
+                            <tr>
+                                <td><code>close()</code></td>
+                                <td>None</td>
+                                <td><code>bool</code></td>
+                                <td>Closes the file descriptor, flushing changes to the physical disk.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-        <h3>Reading & Writing Files</h3>
-        <pre>&lt;?php
-$file = new File();
+                <h3>Example: App Log Writer</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$f = new File();
 
-// Write to file
-$file->open("test.txt", "w");
-$file->write("Line 1\nLine 2\n");
-$file->close();
+// Writing log event
+$f->open("app.log", "a");
+$f->write("LOG EVENT: Auth verified at 12:00PM\n");
+$f->close();
 
-// Read from file
-$file->open("test.txt", "r");
-$lines = $file->readLines();
-$file->close();
+// Reading log history
+$f->open("app.log", "r");
+$lines = $f->readLines();
+$f->close();
 
-for ($i = 0; $i < count($lines); $i++) {
-    echo "Read: " . $lines[$i] . "\n";
-}
+echo "Total Logs Recorded: " . count($lines) . "\n";
+?></code></pre>
+            </div>
+        </section>
 
-// Check existence & Delete
-if ($file->exists("test.txt")) {
-    $file->delete("test.txt");
-}
-?&gt;</pre>
-    </section>
+        <!-- SECTION 8 -->
+        <section id="concurrency">
+            <div class="section-card">
+                <h2>8. Concurrency & Channels</h2>
+                <p>PHX features built-in Go concurrency abstractions. You can execute tasks asynchronously, sync execution paths, and pass messages safely using channels.</p>
 
-    <div class="section-separator"></div>
+                <h3>Syntax & Definitions</h3>
+                <p><strong>Spawn</strong>: The <code>spawn(closure)</code> statement runs the closure concurrently in a Go goroutine and returns a <code>Thread</code> object. The compiler ensures safe type isolation.</p>
+                <p><strong>Join</strong>: Call <code>$thread-&gt;join()</code> to block the parent thread until the spawned task completes, returning its result.</p>
+                <p><strong>Channel</strong>: Created via <code>channel(capacity)</code>. Pass messages using <code>send(chan, val)</code> and read using <code>receive(chan)</code>.</p>
 
-    <!-- SECTION 8 -->
-    <section id="concurrency">
-        <h2>8. Concurrency & Channels</h2>
-        <p>PHX features powerful Go-native concurrency tools built straight into the compiler language model.</p>
-
-        <h3>Spawning Threads & Joining Results</h3>
-        <p>The <code>spawn()</code> statement runs a closure asynchronously in a Go goroutine and returns a <code>Thread</code>. Call <code>join()</code> on the thread to block execution until the thread terminates and returns its result.</p>
-        <pre>&lt;?php
-$thread = spawn(function() {
+                <h3>Example: Parallel Scraper & Synchronization</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// Spawn a background worker task
+$worker = spawn(function() {
     sleep(1);
-    return 100;
+    return "Fetched remote API payload";
 });
 
-// Do other work here...
+// Perform local operations concurrently
+echo "Computing database results locally...\n";
 
-$result = $thread->join();
-echo "Thread result: " . $result . "\n";
-?&gt;</pre>
+// Await worker response
+$data = $worker->join();
+echo "Task Result: " . $data . "\n";
+?></code></pre>
 
-        <h3>Using Channels</h3>
-        <p>Channels allow threads to communicate with each other safely. Create channels with <code>channel(capacity)</code>, send values using <code>send(chan, val)</code>, and receive values using <code>receive(chan)</code>.</p>
-        <pre>&lt;?php
-$ch = channel(5);
+                <h3>Example: Inter-Thread Messaging via Channels</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$queue = channel(10); // Channel of capacity 10
 
-spawn(function() use ($ch) {
-    send($ch, "Message from thread");
+// Worker thread
+spawn(function() use ($queue) {
+    for ($i = 1; $i &lt;= 3; $i++) {
+        send($queue, "Data Packet #" . $i);
+        sleep(1);
+    }
+    send($queue, "EOF");
 });
 
-$msg = receive($ch);
-echo "Received: " . $msg . "\n";
-?&gt;</pre>
-    </section>
+// Listener thread
+while (true) {
+    $msg = receive($queue);
+    if ($msg === "EOF") {
+        break;
+    }
+    echo "Listener Received: " . $msg . "\n";
+}
+?></code></pre>
+            </div>
+        </section>
 
-    <div class="section-separator"></div>
+        <!-- SECTION 9 -->
+        <section id="http-server">
+            <div class="section-card">
+                <h2>9. High-Performance HTTP, Database Connection Pools & NoSQL</h2>
+                <p>PHX includes an enterprise-grade, high-performance event-based HTTP server module. Built on top of Go's native asynchronous network poller, it automatically utilizes goroutines to multiplex and handle millions of concurrent HTTP requests efficiently. It supports an advanced middleware pipeline, regex-based routing with dynamic parameters, persistent database connection pooling, and a memory-backed cache system.</p>
 
-    <!-- SECTION 9 -->
-    <section id="compiler">
-        <h2>9. Compiler CLI Usage</h2>
-        <p>Once you write a PHX program, you can run or build it using the PHX toolchain executable.</p>
+                <h3>Class: <code>HttpServer</code> Methods Reference</h3>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Arguments</th>
+                                <th>Returns</th>
+                                <th>Description / Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>configure(array $config)</code></td>
+                                <td><code>$config</code>: associative array (e.g. <code>["workers" => 8, "max_connections" => 10000]</code>)</td>
+                                <td><code>HttpServer</code></td>
+                                <td>Configures server concurrency thresholds and worker pool configurations. Supports chaining.</td>
+                            </tr>
+                            <tr>
+                                <td><code>use(function|string $middleware)</code></td>
+                                <td><code>$middleware</code>: callback closure <code>function($req, $res, $next)</code> or Middleware class name</td>
+                                <td><code>HttpServer</code></td>
+                                <td>Registers a middleware handler into the request lifecycle pipeline. Supports chaining.</td>
+                            </tr>
+                            <tr>
+                                <td><code>router()</code></td>
+                                <td>None</td>
+                                <td><code>Router</code></td>
+                                <td>Returns the primary routing instance.</td>
+                            </tr>
+                            <tr>
+                                <td><code>database(array $pools)</code></td>
+                                <td><code>$pools</code>: config array of database details (host, user, database, driver)</td>
+                                <td><code>HttpServer</code></td>
+                                <td>Initializes named database pools. Supports MySQL and PostgreSQL drivers. Supports chaining.</td>
+                            </tr>
+                            <tr>
+                                <td><code>db(string $poolName)</code></td>
+                                <td><code>$poolName</code>: name of database pool (default is <code>"default"</code>)</td>
+                                <td><code>Database</code></td>
+                                <td>Resolves and returns a Database connection wrapper from the specified pool.</td>
+                            </tr>
+                            <tr>
+                                <td><code>cache()</code></td>
+                                <td>None</td>
+                                <td><code>Cache</code></td>
+                                <td>Returns the global thread-safe in-memory cache singleton.</td>
+                            </tr>
+                            <tr>
+                                <td><code>listen(int $port)</code></td>
+                                <td><code>$port</code>: port number</td>
+                                <td><code>null</code></td>
+                                <td><span class="badge badge-block">Blocks</span> Starts the HTTP server. Binds to the TCP port and handles incoming connections.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-        <h3>Compile and Run:</h3>
-        <pre>$ bin/phx run your_program.php</pre>
+                <h3>Class: <code>Router</code> Methods Reference</h3>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Arguments</th>
+                                <th>Returns</th>
+                                <th>Description / Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>get|post|put|delete(string $path, function $handler)</code></td>
+                                <td><code>$path</code> (route pattern matching), <code>$handler</code> (closure callback)</td>
+                                <td><code>Router</code></td>
+                                <td>Registers a route with dynamic parameters parsed within curly braces <code>{name}</code>. Supports chaining.</td>
+                            </tr>
+                            <tr>
+                                <td><code>group(string $prefix, function $callback)</code></td>
+                                <td><code>$prefix</code> (url group prefix), <code>$callback</code> (closure group setup)</td>
+                                <td><code>Router</code></td>
+                                <td>Creates a route group matching prefixes (e.g. <code>/api/v1</code>). All sub-routes inherit this prefix. Supports chaining.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-        <h3>Build a Standalone Binary:</h3>
-        <pre>$ bin/phx build -o bin/output_executable your_program.php
-$ ./bin/output_executable</pre>
-    </section>
+                <h3>Class: <code>HttpRequest</code> Methods Reference</h3>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Returns</th>
+                                <th>Description / Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>getMethod()</code></td>
+                                <td><code>string</code></td>
+                                <td>Returns the request method (e.g. <code>"GET"</code>, <code>"POST"</code>).</td>
+                            </tr>
+                            <tr>
+                                <td><code>getPath()</code></td>
+                                <td><code>string</code></td>
+                                <td>Returns the path (e.g. <code>"/users"</code>).</td>
+                            </tr>
+                            <tr>
+                                <td><code>getUri()</code></td>
+                                <td><code>string</code></td>
+                                <td>Returns the raw URI query string.</td>
+                            </tr>
+                            <tr>
+                                <td><code>getHeaders()</code></td>
+                                <td><code>array</code></td>
+                                <td>Returns request headers as an associative array.</td>
+                            </tr>
+                            <tr>
+                                <td><code>getQuery()</code></td>
+                                <td><code>array</code></td>
+                                <td>Returns parsed query string variables.</td>
+                            </tr>
+                            <tr>
+                                <td><code>getBody()</code></td>
+                                <td><code>string</code></td>
+                                <td>Returns the raw string request payload body (e.g. raw JSON).</td>
+                            </tr>
+                            <tr>
+                                <td><code>getParam(string $name)</code></td>
+                                <td><code>string</code></td>
+                                <td>Retrieves value of a matched path parameter from the route pattern.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
+                <h3>Class: <code>HttpResponse</code> Methods Reference</h3>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Arguments</th>
+                                <th>Returns</th>
+                                <th>Description / Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>status(int $code)</code></td>
+                                <td><code>$code</code>: HTTP status code</td>
+                                <td><code>HttpResponse</code></td>
+                                <td>Sets response status code. Supports chaining.</td>
+                            </tr>
+                            <tr>
+                                <td><code>header(string $name, string $value)</code></td>
+                                <td><code>$name</code>: header key, <code>$value</code>: value</td>
+                                <td><code>HttpResponse</code></td>
+                                <td>Sets response HTTP headers. Supports chaining.</td>
+                            </tr>
+                            <tr>
+                                <td><code>write(string $content)</code></td>
+                                <td><code>$content</code>: string body block</td>
+                                <td><code>HttpResponse</code></td>
+                                <td>Writes a chunk of content to output stream. Supports chaining.</td>
+                            </tr>
+                            <tr>
+                                <td><code>end(string $content = "")</code></td>
+                                <td><code>$content</code> (optional final string)</td>
+                                <td><code>null</code></td>
+                                <td>Sends content, flushes headers, and terminates connection stream.</td>
+                            </tr>
+                            <tr>
+                                <td><code>json(array|val $value)</code></td>
+                                <td><code>$value</code>: array or printable value</td>
+                                <td><code>null</code></td>
+                                <td>Serializes the value into JSON, sets content-type to application/json, and calls end().</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Class: <code>Cache</code> Methods Reference</h3>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Arguments</th>
+                                <th>Returns</th>
+                                <th>Description / Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>get(string $key)</code></td>
+                                <td><code>$key</code>: cache key</td>
+                                <td><code>val|null</code></td>
+                                <td>Retrieves value. Returns <code>null</code> if key has expired or does not exist.</td>
+                            </tr>
+                            <tr>
+                                <td><code>set(string $key, val $value, int $ttlSeconds)</code></td>
+                                <td><code>$key</code>, <code>$value</code>, <code>$ttlSeconds</code> (default is 0: persistent)</td>
+                                <td><code>bool</code></td>
+                                <td>Stores value with an expiration timer.</td>
+                            </tr>
+                            <tr>
+                                <td><code>delete(string $key)</code></td>
+                                <td><code>$key</code>: cache key</td>
+                                <td><code>bool</code></td>
+                                <td>Removes key from the in-memory cache map.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Built-in Relational Database Clients (MySQL & PostgreSQL)</h3>
+                <p>MySQL and PostgreSQL objects execute database commands. You can connect, run queries that return record arrays, or execute write transactions.</p>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Arguments</th>
+                                <th>Returns</th>
+                                <th>Description / Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>connect(string $host, string $user, string $pass, string $db, int $port)</code></td>
+                                <td><code>$host</code>, <code>$user</code>, <code>$pass</code>, <code>$db</code>, <code>$port</code> (port argument is optional for Postgres: defaults to 5432)</td>
+                                <td><code>bool</code></td>
+                                <td>Connects to the database server. Automatically creates the database if it does not exist.</td>
+                            </tr>
+                            <tr>
+                                <td><code>query(string $sql)</code></td>
+                                <td><code>$sql</code>: SQL select statement</td>
+                                <td><code>array</code></td>
+                                <td>Runs query and returns an associative array representing all rows.</td>
+                            </tr>
+                            <tr>
+                                <td><code>exec(string $sql)</code></td>
+                                <td><code>$sql</code>: SQL statement (insert/update/delete)</td>
+                                <td><code>bool</code></td>
+                                <td>Executes command statement. Returns true if executed successfully.</td>
+                            </tr>
+                            <tr>
+                                <td><code>close()</code></td>
+                                <td>None</td>
+                                <td><code>bool</code></td>
+                                <td>Closes active connection pool handle.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Example: Standalone MySQL Operations</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$db = new MySQL();
+$db->connect("localhost:3306", "root", "password", "test_db");
+
+// Write schema
+$db->exec("CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255))");
+$db->exec("INSERT INTO users (name) VALUES ('Vicky')");
+
+// Read rows
+$rows = $db->query("SELECT * FROM users");
+for ($i = 0; $i &lt; count($rows); $i++) {
+    $row = $rows[$i];
+    echo "User ID: " . $row["id"] . ", Name: " . $row["name"] . "\n";
+}
+$db->close();
+?></code></pre>
+
+                <h3>Built-in Document Database Client (MongoDB Mock)</h3>
+                <p>MongoDB object offers an easy-to-use API to persist and find document arrays. It uses an internal high-performance structured memory engine.</p>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Arguments</th>
+                                <th>Returns</th>
+                                <th>Description / Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>connect(string $uri)</code></td>
+                                <td><code>$uri</code> (connection string)</td>
+                                <td><code>bool</code></td>
+                                <td>Connects to the database instance.</td>
+                            </tr>
+                            <tr>
+                                <td><code>selectDatabase(string $dbName)</code></td>
+                                <td><code>$dbName</code>: database name</td>
+                                <td><code>bool</code></td>
+                                <td>Selects current working database context.</td>
+                            </tr>
+                            <tr>
+                                <td><code>selectCollection(string $collName)</code></td>
+                                <td><code>$collName</code>: collection name</td>
+                                <td><code>bool</code></td>
+                                <td>Selects current collection context.</td>
+                            </tr>
+                            <tr>
+                                <td><code>insertOne(array $document)</code></td>
+                                <td><code>$document</code>: associative array</td>
+                                <td><code>bool</code></td>
+                                <td>Inserts a document into the current collection context.</td>
+                            </tr>
+                            <tr>
+                                <td><code>find(array $filter)</code></td>
+                                <td><code>$filter</code>: key-value filter parameters (optional)</td>
+                                <td><code>array</code></td>
+                                <td>Searches and returns matching documents in collection.</td>
+                            </tr>
+                            <tr>
+                                <td><code>close()</code></td>
+                                <td>None</td>
+                                <td><code>bool</code></td>
+                                <td>Closes current MongoDB session.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Example: Standalone MongoDB Operations</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$mongo = new MongoDB();
+$mongo->connect("mongodb://localhost:27017");
+$mongo->selectDatabase("production");
+$mongo->selectCollection("products");
+
+// Insert document
+$mongo->insertOne([
+    "sku" => "PROD-100",
+    "name" => "PHX Server License",
+    "price" => 299
+]);
+
+// Find document
+$results = $mongo->find(["sku" => "PROD-100"]);
+if (count($results) > 0) {
+    $product = $results[0];
+    echo "Found Product: " . $product["name"] . " costing $" . $product["price"] . "\n";
+}
+$mongo->close();
+?></code></pre>
+
+                <h3>Enterprise Cloud Service Example</h3>
+                <p>Below is a production-ready application using event-based routing, database pooling, caching, and a logging middleware pipeline:</p>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$server = new HttpServer();
+
+// 1. Configure the server runtime
+$server->configure([
+    "workers" => 8,
+    "max_connections" => 10000,
+    "keep_alive" => 60
+]);
+
+// 2. Logging middleware
+$server->use(function($req, $res, $next) {
+    $method = $req->getMethod();
+    $path = $req->getPath();
+    $start = microtime(true);
+    
+    $nextRes = $next($req);
+    
+    $duration = (microtime(true) - $start) * 1000;
+    echo "[" . $method . "] " . $path . " - processed in " . $duration . "ms\n";
+    return $nextRes;
+});
+
+// 3. Database connection pool
+$server->database([
+    "default" => [
+        "driver" => "mysql",
+        "host" => "localhost:3306",
+        "database" => "phx_db",
+        "user" => "root",
+        "password" => "password",
+        "pool_size" => 15
+    ]
+]);
+
+// 4. Routes definitions
+$router = $server->router();
+
+$router->get("/", function($req, $res) {
+    $res->status(200)->end("<h1>PHX Enterprise Cloud Engine Running</h1>");
+});
+
+$router->group("/api/v1", function($group) use ($server) {
+    
+    // Database query route
+    $group->get("/users/{id}", function($req, $res, $id) use ($server) {
+        $db = $server->db("default");
+        $rows = $db->query("SELECT id, name, role FROM users WHERE id = " . $id);
+        
+        if (count($rows) === 0) {
+            $res->status(404)->json(["error" => "User not found"]);
+            return null;
+        }
+        $res->json($rows[0]);
+    });
+
+    // Thread-safe Cache route
+    $group->get("/stats", function($req, $res) use ($server) {
+        $cache = $server->cache();
+        $counter = $cache->get("requests_counter");
+        
+        if ($counter === null) {
+            $counter = 1;
+        } else {
+            $counter = $counter + 1;
+        }
+        
+        $cache->set("requests_counter", $counter, 60); // Cache for 60 seconds
+        
+        $res->json([
+            "total_visits" => $counter,
+            "cached" => true
+        ]);
+    });
+});
+
+$server->listen(8085);
+?></code></pre>
+            </div>
+        </section>
+
+        <!-- SECTION 10 -->
+        <section id="compiler">
+            <div class="section-card">
+                <h2>10. Compiler CLI Usage</h2>
+                <p>PHX packages a compilation command-line tool. You can execute files on-the-fly or compile them into binary executables with no external runtime dependencies.</p>
+
+                <h3>Execution Modes</h3>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Primary Action / Meaning</th>
+                                <th>Use Case Scenario</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>bin/phx run app.php</code></td>
+                                <td>Parses, compiles to Go, builds a temporary binary, and runs it on the fly.</td>
+                                <td>Local developer iterations, rapid prototyping.</td>
+                            </tr>
+                            <tr>
+                                <td><code>bin/phx build -o my_app app.php</code></td>
+                                <td>Compiles to Go and compiles a native standalone binary inside the output file path.</td>
+                                <td>Docker container distributions, staging/production deployments.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Example: Creating Standalone App</h3>
+                <pre><div class="highlight-bar"></div><code>$ bin/phx build -o production_server todo_app/index.php
+$ ./production_server
+Todo App listening on http://localhost:8085
+PHX Server listening on http://localhost:8085</code></pre>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Simple scrollspy to highlight active sidebar nav item
+        const links = document.querySelectorAll('aside a');
+        const sections = document.querySelectorAll('section');
+
+        function changeLinkState() {
+            let index = sections.length;
+
+            while(--index && window.scrollY + 100 < sections[index].offsetTop) {}
+            
+            links.forEach((link) => link.classList.remove('active'));
+            if (index >= 0) {
+                links[index].classList.add('active');
+            }
+        }
+
+        changeLinkState();
+        window.addEventListener('scroll', changeLinkState);
+    </script>
 </body>
 </html>

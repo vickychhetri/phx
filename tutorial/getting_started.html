@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started - Building Your First PHX Cloud Application</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #030712;
+            --sidebar-bg: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.06);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-grad: linear-gradient(135deg, #a78bfa, #f472b6);
+            --code-bg: #090d16;
+            --code-border: rgba(139, 92, 246, 0.15);
+            --highlight: #1e1b4b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            display: flex;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-purple);
+        }
+
+        /* Sidebar navigation */
+        aside {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 30px 20px;
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 35px;
+            padding-left: 10px;
+        }
+
+        .logo-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .logo-sub {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-left: 8px;
+            border: 1px solid var(--accent-purple);
+            padding: 1px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 15px;
+            padding-left: 10px;
+            margin-top: 20px;
+        }
+
+        aside ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        aside a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 10px 14px;
+            border-radius: 8px;
+            display: block;
+            transition: all 0.2s ease-in-out;
+            border-left: 3px solid transparent;
+        }
+
+        aside a:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        aside li.active a, aside a.active {
+            color: #ffffff;
+            background: rgba(139, 92, 246, 0.1);
+            border-left-color: var(--accent-purple);
+        }
+
+        /* Main Content area */
+        main {
+            margin-left: 280px;
+            flex-grow: 1;
+            padding: 50px 80px;
+            max-width: 1100px;
+            position: relative;
+        }
+
+        header {
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin-bottom: 10px;
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-desc {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+        }
+
+        /* Section layout */
+        section {
+            margin-bottom: 60px;
+            scroll-margin-top: 40px;
+        }
+
+        .section-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .section-card:hover {
+            border-color: rgba(139, 92, 246, 0.2);
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 24px;
+            background: var(--accent-grad);
+            border-radius: 2px;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 30px;
+            margin-bottom: 12px;
+            color: #ffffff;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            font-size: 0.975rem;
+        }
+
+        /* Steps */
+        .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-purple);
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-right: 12px;
+        }
+
+        /* Code Block formatting */
+        pre {
+            background-color: var(--code-bg);
+            border: 1px solid var(--code-border);
+            border-radius: 10px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Inline code */
+        p code, li code {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: var(--accent-pink);
+            font-size: 0.85em;
+        }
+
+        .highlight-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            bottom: 0;
+            background: var(--accent-grad);
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+        }
+
+        .alert-box {
+            background-color: rgba(139, 92, 246, 0.05);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Responsive layout */
+        @media (max-width: 900px) {
+            body {
+                flex-direction: column;
+            }
+            aside {
+                width: 100%;
+                position: static;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                padding: 20px;
+            }
+            main {
+                margin-left: 0;
+                padding: 40px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="logo-container">
+            <div class="logo-text">PHX</div>
+            <div class="logo-sub">docs</div>
+        </div>
+        <div class="nav-title">Developer Guide</div>
+        <ul>
+            <li><a href="index.html">← Back to Language Reference</a></li>
+        </ul>
+        <div class="nav-title">Tutorial</div>
+        <ul>
+            <li class="active"><a href="#prereq">1. Prerequisites</a></li>
+            <li><a href="#step-1">2. Basic Hello Server</a></li>
+            <li><a href="#step-2">3. Adding Custom Router</a></li>
+            <li><a href="#step-3">4. Custom Middleware</a></li>
+            <li><a href="#step-4">5. In-Memory Caching</a></li>
+            <li><a href="#running">6. Running & Testing</a></li>
+        </ul>
+    </aside>
+
+    <main>
+        <header>
+            <h1>Getting Started Tutorial</h1>
+            <p class="header-desc">Build your first high-performance, concurrent, memory-cached REST API with PHX from absolute scratch.</p>
+        </header>
+
+        <!-- PREREQUISITES -->
+        <section id="prereq">
+            <div class="section-card">
+                <h2>1. Prerequisites & Environment</h2>
+                <p>Before launching your first microservice, make sure the PHX compiler binary is built and available in your path.</p>
+
+                <h3>Build the PHX Toolchain</h3>
+                <p>Run the following command in the root folder of the PHX directory to build the compiler:</p>
+                <pre><div class="highlight-bar"></div><code>$ go build -o bin/phx ./cmd/phx</code></pre>
+            </div>
+        </section>
+
+        <!-- STEP 1 -->
+        <section id="step-1">
+            <div class="section-card">
+                <h2>2. Creating a Basic Hello Server</h2>
+                <p>Create a file named <code>app.php</code> in your working directory. We will instantiate the <code>HttpServer</code> class and listen on port <code>8085</code>.</p>
+                
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$server = new HttpServer();
+
+$server->listen(8085, function($req, $res) {
+    $res->status(200)
+        ->header("Content-Type", "text/plain")
+        ->end("Hello from PHX Cloud App!");
+});
+?></code></pre>
+
+                <h3>Syntax Breakdown</h3>
+                <ul class="square-list">
+                    <li><code>new HttpServer()</code>: Instantiates the enterprise HTTP server wrapper class.</li>
+                    <li><code>$server->listen(8085, function($req, $res) { ... })</code>: Binds the server to TCP port 8085 and registers a callback closure to execute for every incoming client connection.</li>
+                    <li><code>$res->status(200)->header(...)</code>: Fluent response methods chaining to specify response attributes before sending.</li>
+                    <li><code>->end("...")</code>: Ends the HTTP request transaction by writing the last chunk and flushing it to the network socket.</li>
+                </ul>
+
+                <h3>Underlying Meaning & Behavior</h3>
+                <p>When compiled, the PHX compiler translates the <code>HttpServer</code> class directly to Go's standard <code>net/http</code> package. The callback closure is run inside an isolated Go goroutine spawned automatically for each client socket connection. This allows the server to scale concurrently to handle thousands of requests per second without blocking the main event execution loop.</p>
+
+                <h3>Use-Case Scenario</h3>
+                <p>Used to construct basic health-check endpoints, simple ping handlers, or webhook receivers that require minimal computation and rapid response delivery.</p>
+
+                <div class="alert-box">
+                    <div class="alert-title">💡 Standard Response Chaining</div>
+                    <p style="margin-bottom:0;">The <code>$res</code> object supports method chaining on <code>status()</code> and <code>header()</code> to keep your code highly readable and clean.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 2 -->
+        <section id="step-2">
+            <div class="section-card">
+                <h2>3. Adding the Router & Parameters</h2>
+                <p>For more complex APIs, register a <code>Router</code> instance. It compiles path patterns like <code>/users/{id}</code> to optimized regular expressions.</p>
+                
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$server = new HttpServer();
+$router = $server->router();
+
+// Basic Route
+$router->get("/", function($req, $res) {
+    $res->status(200)->end("Home Route");
+});
+
+// Route with Dynamic Parameters
+$router->get("/api/v1/users/{id}", function($req, $res, $id) {
+    $res->json([
+        "user_id" => $id,
+        "name" => "User Account #" . $id,
+        "roles" => ["developer"]
+    ]);
+});
+
+$server->listen(8085);
+?></code></pre>
+
+                <h3>Syntax Breakdown</h3>
+                <ul class="square-list">
+                    <li><code>$server->router()</code>: Resolves and returns the routing manager object.</li>
+                    <li><code>$router->get("/pattern", function)</code>: Binds a GET HTTP request route.</li>
+                    <li><code>{id}</code>: A dynamic path parameter variable matching alphanumeric values in the URL.</li>
+                    <li><code>$res->json(array)</code>: Formats and serializes a native array into a JSON payload, sets the <code>Content-Type: application/json</code> header, and sends it to the client.</li>
+                </ul>
+
+                <h3>Underlying Meaning & Behavior</h3>
+                <p>The routing manager compiles URL patterns containing curly braces into Go regular expressions (e.g. <code>^/api/v1/users/([^/]+)$</code>). When a request arrives, the router matches the path, parses the parameter arguments, and passes them dynamically to the callback closure arguments.</p>
+
+                <h3>Use-Case Scenario</h3>
+                <p>Developing RESTful microservices, API servers returning structured data from databases, or routing user resource requests based on unique identifiers.</p>
+            </div>
+        </section>
+
+        <!-- STEP 3 -->
+        <section id="step-3">
+            <div class="section-card">
+                <h2>4. Creating a Custom Middleware</h2>
+                <p>Middleware allows intercepting requests before they reach the router. Middlewares receive the request, response, and a <code>$next</code> closure parameter. Calling <code>$next($req)</code> moves the request forward.</p>
+                
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$server = new HttpServer();
+
+// Logger Middleware
+$server->use(function($req, $res, $next) {
+    $start = microtime(true);
+    
+    // Pass execution down the pipeline
+    $nextRes = $next($req);
+    
+    $elapsed = (microtime(true) - $start) * 1000;
+    echo "[" . $req->getMethod() . "] " . $req->getPath() . " processed in " . $elapsed . "ms\n";
+    return $nextRes;
+});
+
+// Guard Middleware
+$server->use(function($req, $res, $next) {
+    if ($req->getPath() === "/admin") {
+        $headers = $req->getHeaders();
+        if ($headers["Authorization"] !== "SecretToken") {
+            $res->status(401)->json(["error" => "Unauthorized"]);
+            return null; // Terminate execution early (do not call $next)
+        }
+    }
+    return $next($req);
+});
+
+$server->listen(8085);
+?></code></pre>
+
+                <h3>Syntax Breakdown</h3>
+                <ul class="square-list">
+                    <li><code>$server->use(function($req, $res, $next) { ... })</code>: Inserts a handler function into the global request processing stack.</li>
+                    <li><code>$next($req)</code>: The execution step trigger callback. Initiates the next middleware or routes the request to its final destination.</li>
+                    <li><code>return null;</code>: Short-circuits the pipeline. Terminates request processing without letting downstream handlers see it.</li>
+                </ul>
+
+                <h3>Underlying Meaning & Behavior</h3>
+                <p>Middlewares are modeled as a nested execution chain. When a middleware triggers <code>$next($req)</code>, control yields to the subsequent function. When that function returns a response object, execution returns to the parent middleware, allowing it to inspect response structures, measure elapsed execution time, or compress payloads.</p>
+
+                <h3>Use-Case Scenario</h3>
+                <p>API authentication checks (Bearer token validation), rate limiting, request CORS headers initialization, audit logging, and metric tracking.</p>
+            </div>
+        </section>
+
+        <!-- STEP 4 -->
+        <section id="step-4">
+            <div class="section-card">
+                <h2>5. Adding In-Memory Cache</h2>
+                <p>Boost your service's performance by storing slow operation results in the shared thread-safe Cache. The cache instance can be resolved via <code>$server->cache()</code> or <code>new Cache()</code>.</p>
+                
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+$server = new HttpServer();
+$router = $server->router();
+
+$router->get("/api/data", function($req, $res) {
+    $cache = new Cache();
+    
+    // Attempt retrieving from cache
+    $data = $cache->get("my_slow_data");
+    if ($data === null) {
+        // Slow calculation or database lookup simulation
+        $data = "High-performance result";
+        
+        // Cache the result for 30 seconds
+        $cache->set("my_slow_data", $data, 30);
+    }
+    
+    $res->json(["data" => $data]);
+});
+
+$server->listen(8085);
+?></code></pre>
+
+                <h3>Syntax Breakdown</h3>
+                <ul class="square-list">
+                    <li><code>new Cache()</code>: Instantiates or references the shared in-memory Cache instance.</li>
+                    <li><code>$cache->get("key")</code>: Looks up a stored value. Returns <code>null</code> if key has expired or does not exist.</li>
+                    <li><code>$cache->set("key", $val, $ttl)</code>: Stores a value with a Time-To-Live expiration limit in seconds.</li>
+                </ul>
+
+                <h3>Underlying Meaning & Behavior</h3>
+                <p>The Cache maps string keys to values protected by a Go <code>sync.RWMutex</code>. It handles high-concurrency read and write cycles safely. A background cleaning worker checks keys and purges expired entries automatically, ensuring memory bounds are respected.</p>
+
+                <h3>Use-Case Scenario</h3>
+                <p>Caching third-party API payloads, storing configuration parameters, speed-optimizing database queries, and managing user session details.</p>
+            </div>
+        </section>
+
+        <!-- RUNNING -->
+        <section id="running">
+            <div class="section-card">
+                <h2>6. Running & Testing Your Application</h2>
+                <p>Run your PHP script directly with the PHX binary. The engine compiles it to a native Go server and launches it on port 8085:</p>
+                <pre><div class="highlight-bar"></div><code>$ bin/phx run app.php
+PHX Server listening on http://localhost:8085</code></pre>
+
+                <h3>Test with curl</h3>
+                <p>Test the dynamic parameters routing endpoint using <code>curl</code>:</p>
+                <pre><div class="highlight-bar"></div><code>$ curl -i http://localhost:8085/api/v1/users/99
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"user_id":"99","name":"User Account #99","roles":["developer"]}</code></pre>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const links = document.querySelectorAll('aside a');
+        const sections = document.querySelectorAll('section');
+
+        function changeLinkState() {
+            let index = sections.length;
+
+            while(--index && window.scrollY + 100 < sections[index].offsetTop) {}
+            
+            links.forEach((link) => link.classList.remove('active'));
+            if (index >= 0) {
+                links[index].classList.add('active');
+            }
+        }
+
+        changeLinkState();
+        window.addEventListener('scroll', changeLinkState);
+    </script>
+</body>
+</html>

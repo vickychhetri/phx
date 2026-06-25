@@ -18,6 +18,26 @@ import (
 var EmbeddedMainPHP string
 var EmbeddedFiles = map[string]string{}
 
+const tempGoMod = `module temp
+
+go 1.25.10
+
+require (
+	github.com/go-sql-driver/mysql v1.10.0
+	github.com/lib/pq v1.12.3
+)
+
+require filippo.io/edwards25519 v1.2.0 // indirect
+`
+
+const tempGoSum = `filippo.io/edwards25519 v1.2.0 h1:crnVqOiS4jqYleHd9vaKZ+HKtHfllngJIiOpNpoJsjo=
+filippo.io/edwards25519 v1.2.0/go.mod h1:xzAOLCNug/yB62zG1bQ8uziwrIqIuxhctzJT18Q77mc=
+github.com/go-sql-driver/mysql v1.10.0 h1:Q+1LV8DkHJvSYAdR83XzuhDaTykuDx0l6fkXxoWCWfw=
+github.com/go-sql-driver/mysql v1.10.0/go.mod h1:M+cqaI7+xxXGG9swrdeUIoPG3Y3KCkF0pZej+SK+nWk=
+github.com/lib/pq v1.12.3 h1:tTWxr2YLKwIvK90ZXEw8GP7UFHtcbTtty8zsI+YjrfQ=
+github.com/lib/pq v1.12.3/go.mod h1:/p+8NSbOcwzAEI7wiMXFlgydTwcgTr3OSKMsD2BitpA=
+`
+
 func main() {
 	if EmbeddedMainPHP != "" {
 		vm.VirtualFilesystem = EmbeddedFiles
@@ -172,12 +192,28 @@ func runInterpreter(filePath string) {
 	}
 
 	// Create temporary directory for building
-	tempDir, err := ioutil.TempDir(".", "phx_run_")
+	tempDir, err := ioutil.TempDir("", "phx_run_")
 	if err != nil {
 		fmt.Printf("Error creating temp dir: %v\n", err)
 		os.Exit(1)
 	}
 	defer os.RemoveAll(tempDir)
+
+	tempModFile := filepath.Join(tempDir, "go.mod")
+	err = ioutil.WriteFile(tempModFile, []byte(tempGoMod), 0644)
+	if err != nil {
+		fmt.Printf("Error writing temporary go.mod: %v\n", err)
+		os.RemoveAll(tempDir)
+		os.Exit(1)
+	}
+
+	tempSumFile := filepath.Join(tempDir, "go.sum")
+	err = ioutil.WriteFile(tempSumFile, []byte(tempGoSum), 0644)
+	if err != nil {
+		fmt.Printf("Error writing temporary go.sum: %v\n", err)
+		os.RemoveAll(tempDir)
+		os.Exit(1)
+	}
 
 	tempGoFile := filepath.Join(tempDir, "main.go")
 	err = ioutil.WriteFile(tempGoFile, []byte(goCode), 0644)
@@ -188,7 +224,8 @@ func runInterpreter(filePath string) {
 	}
 
 	tempBin := filepath.Join(tempDir, "app")
-	buildCmd := exec.Command("go", "build", "-o", tempBin, tempGoFile)
+	buildCmd := exec.Command("go", "build", "-o", tempBin, "main.go")
+	buildCmd.Dir = tempDir
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 	err = buildCmd.Run()
@@ -421,12 +458,28 @@ func runBuild(mainFilePath string, outputBinary string) {
 	}
 
 	// Create temp folder
-	tempDir, err := ioutil.TempDir(".", "phx_build_")
+	tempDir, err := ioutil.TempDir("", "phx_build_")
 	if err != nil {
 		fmt.Printf("Error creating temp dir: %v\n", err)
 		os.Exit(1)
 	}
 	defer os.RemoveAll(tempDir)
+
+	tempModFile := filepath.Join(tempDir, "go.mod")
+	err = ioutil.WriteFile(tempModFile, []byte(tempGoMod), 0644)
+	if err != nil {
+		fmt.Printf("Error writing temporary go.mod: %v\n", err)
+		os.RemoveAll(tempDir)
+		os.Exit(1)
+	}
+
+	tempSumFile := filepath.Join(tempDir, "go.sum")
+	err = ioutil.WriteFile(tempSumFile, []byte(tempGoSum), 0644)
+	if err != nil {
+		fmt.Printf("Error writing temporary go.sum: %v\n", err)
+		os.RemoveAll(tempDir)
+		os.Exit(1)
+	}
 
 	tempGoFile := filepath.Join(tempDir, "main.go")
 	err = ioutil.WriteFile(tempGoFile, []byte(goCode), 0644)
@@ -436,7 +489,15 @@ func runBuild(mainFilePath string, outputBinary string) {
 		os.Exit(1)
 	}
 
-	cmd := exec.Command("go", "build", "-o", outputBinary, tempGoFile)
+	absOutputBinary, err := filepath.Abs(outputBinary)
+	if err != nil {
+		fmt.Printf("Error getting absolute path for output: %v\n", err)
+		os.RemoveAll(tempDir)
+		os.Exit(1)
+	}
+
+	cmd := exec.Command("go", "build", "-o", absOutputBinary, "main.go")
+	cmd.Dir = tempDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()

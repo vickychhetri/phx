@@ -54,6 +54,23 @@ func hasTryCatch(node ast.Node) bool {
 		return hasTryCatch(n.Condition) || hasTryCatch(n.Body)
 	case *ast.TryCatchStatement:
 		return true
+	case *ast.IncludeStatement:
+		strLit, ok := n.Expression.(*ast.StringLiteral)
+		if !ok {
+			return false
+		}
+		filename := strLit.Value
+		content, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return false
+		}
+		l := lexer.New(string(content))
+		p := parser.New(l)
+		prog := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			return false
+		}
+		return hasTryCatch(prog)
 	}
 	return false
 }
@@ -70,6 +87,25 @@ func (c *Compiler) Compile(program *ast.Program) (string, error) {
 
 	// Declare global variables in main
 	buf.WriteString("func main() {\n")
+	buf.WriteString(`	defer func() {
+		if r := recover(); r != nil {
+			if pe, ok := r.(PHXException); ok {
+				var msg string
+				if pe.Value.Type == 9 && pe.Value.Obj != nil {
+					if res, err := pe.Value.Obj.Call("getMessage"); err == nil {
+						msg = res.Str
+					}
+				}
+				if msg == "" {
+					msg = fmt.Sprintf("%v", pe.Value)
+				}
+				fmt.Fprintf(os.Stderr, "Fatal error: Uncaught exception: %s\n", msg)
+				os.Exit(1)
+			}
+			panic(r)
+		}
+	}()
+`)
 	if hasTryCatch(program) {
 		buf.WriteString("\tvar isReturn bool\n")
 		buf.WriteString("\tvar returnVal Val\n")
@@ -82,6 +118,9 @@ func (c *Compiler) Compile(program *ast.Program) (string, error) {
 			varNames = append(varNames, "v_"+name)
 		}
 		buf.WriteString(fmt.Sprintf("\tvar %s Val\n", strings.Join(varNames, ", ")))
+		for _, name := range varNames {
+			buf.WriteString(fmt.Sprintf("\t_ = %s\n", name))
+		}
 	}
 
 	// Compile all statements in main
@@ -98,8 +137,6 @@ func (c *Compiler) isIntExpr(expr ast.Expression) (string, bool) {
 		return "", false
 	}
 	switch n := expr.(type) {
-	case *ast.Variable:
-		return c.getVarName(n.Value) + ".Int", true
 	case *ast.IntegerLiteral:
 		return fmt.Sprintf("%d", n.Value), true
 	case *ast.InfixExpression:
@@ -203,7 +240,7 @@ func (c *Compiler) compileNode(node ast.Node) string {
 			valCode = c.compileNode(n.ReturnValue)
 		}
 		if c.inTryCatch {
-			return fmt.Sprintf("{\n\t\treturnVal = %s\n\t\tisReturn = true\n\t\treturn Val{}\n\t}", valCode)
+			return fmt.Sprintf("{\n\t\treturnVal = %s\n\t\tisReturn = true\n\t\treturn\n\t}", valCode)
 		}
 		if c.inFunction {
 			return "return " + valCode
@@ -456,6 +493,12 @@ func (c *Compiler) compileNode(node ast.Node) string {
 			buf.WriteString("\t\t}\n")
 		}
 
+		if len(n.Parameters) > 0 {
+			for _, param := range n.Parameters {
+				buf.WriteString(fmt.Sprintf("\t\t_ = v_%s\n", strings.TrimPrefix(param.Var.Value, "$")))
+			}
+		}
+
 		// Collect local variables
 		localVars := make(map[string]bool)
 		c.collectVarsInBody(n.Body, localVars)
@@ -468,6 +511,9 @@ func (c *Compiler) compileNode(node ast.Node) string {
 				varNames = append(varNames, "v_"+name)
 			}
 			buf.WriteString(fmt.Sprintf("\t\tvar %s Val\n", strings.Join(varNames, ", ")))
+			for _, name := range varNames {
+				buf.WriteString(fmt.Sprintf("\t\t_ = %s\n", name))
+			}
 		}
 
 		if hasTryCatch(n.Body) {
@@ -515,6 +561,11 @@ func (c *Compiler) compileNode(node ast.Node) string {
 				buf.WriteString(fmt.Sprintf("\t\t\t%s = %s\n", varName, defaultVal))
 				buf.WriteString("\t\t}\n")
 			}
+			if len(m.Parameters) > 0 {
+				for _, param := range m.Parameters {
+					buf.WriteString(fmt.Sprintf("\t\t_ = v_%s\n", strings.TrimPrefix(param.Var.Value, "$")))
+				}
+			}
 			localVars := make(map[string]bool)
 			c.collectVarsInBody(m.Body, localVars)
 			for _, param := range m.Parameters {
@@ -527,6 +578,14 @@ func (c *Compiler) compileNode(node ast.Node) string {
 					varNames = append(varNames, "v_"+name)
 				}
 				buf.WriteString(fmt.Sprintf("\t\tvar %s Val\n", strings.Join(varNames, ", ")))
+				for _, name := range varNames {
+					buf.WriteString(fmt.Sprintf("\t\t_ = %s\n", name))
+				}
+			}
+			if hasTryCatch(m.Body) {
+				buf.WriteString("\t\tvar isReturn bool\n")
+				buf.WriteString("\t\tvar returnVal Val\n")
+				buf.WriteString("\t\t_, _ = isReturn, returnVal\n")
 			}
 			oldInFunction := c.inFunction
 			c.inFunction = true
@@ -621,6 +680,11 @@ func (c *Compiler) compileNode(node ast.Node) string {
 			buf.WriteString(fmt.Sprintf("\t\t\t%s = %s\n", paramVarName, defaultVal))
 			buf.WriteString("\t\t}\n")
 		}
+		if len(n.Parameters) > 0 {
+			for _, param := range n.Parameters {
+				buf.WriteString(fmt.Sprintf("\t\t_ = v_%s\n", strings.TrimPrefix(param.Var.Value, "$")))
+			}
+		}
 		localVars := make(map[string]bool)
 		c.collectVarsInBody(n.Body, localVars)
 		for _, param := range n.Parameters {
@@ -632,6 +696,9 @@ func (c *Compiler) compileNode(node ast.Node) string {
 				varNames = append(varNames, "v_"+name)
 			}
 			buf.WriteString(fmt.Sprintf("\t\tvar %s Val\n", strings.Join(varNames, ", ")))
+			for _, name := range varNames {
+				buf.WriteString(fmt.Sprintf("\t\t_ = %s\n", name))
+			}
 		}
 		if hasTryCatch(n.Body) {
 			buf.WriteString("\t\tvar isReturn bool\n")
@@ -910,10 +977,15 @@ import (
 	"fmt"
 	"time"
 	"strings"
+	"bytes"
 	"database/sql"
 	"os"
 	"io"
 	"bufio"
+	"net/http"
+	"encoding/json"
+	"regexp"
+	"sync"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 )
@@ -1408,6 +1480,15 @@ func scanSQLRows(rows *sql.Rows) (Val, error) {
 }
 
 func NewObject(className string, args ...Val) Val {
+	if className == "HttpServer" || className == "PHX\\HttpServer" || className == "HTTPServer" || className == "PHX\\HTTPServer" {
+		return Val{Type: 9, Obj: &HTTPServerObject{}}
+	}
+	if className == "Router" || className == "PHX\\Router" {
+		return Val{Type: 9, Obj: &RouterObject{}}
+	}
+	if className == "Cache" || className == "PHX\\Cache" {
+		return Val{Type: 9, Obj: globalCache}
+	}
 	if className == "File" || className == "PHX\\File" {
 		return Val{Type: 9, Obj: &FileObject{}}
 	}
@@ -1665,6 +1746,12 @@ func Ge(a, b Val) Val {
 }
 
 func Eq(a, b Val) Val {
+	if a.Type == 0 || b.Type == 0 {
+		return Val{Type: 3, Bool: a.Type == 0 && b.Type == 0}
+	}
+	if a.Type == 3 && b.Type == 3 {
+		return Val{Type: 3, Bool: a.Bool == b.Bool}
+	}
 	if a.Type == 1 && b.Type == 1 {
 		return Val{Type: 3, Bool: a.Int == b.Int}
 	}
@@ -2145,6 +2232,678 @@ var max = Val{Type: 8, Func: func(args ...Val) Val {
 var intdiv = Val{Type: 8, Func: func(args ...Val) Val {
 	return NewInt(args[0].Int / args[1].Int)
 }}
+
+func valToJSON(v Val) ([]byte, error) {
+	switch v.Type {
+	case 0:
+		return []byte("null"), nil
+	case 1:
+		return json.Marshal(v.Int)
+	case 2:
+		return json.Marshal(v.Float)
+	case 3:
+		return json.Marshal(v.Bool)
+	case 4:
+		return json.Marshal(v.Str)
+	case 5: // Array
+		isSequential := true
+		for i := 0; i < len(v.Array); i += 2 {
+			if v.Array[i].Type != 1 || v.Array[i].Int != int64(i/2) {
+				isSequential = false
+				break
+			}
+		}
+		if isSequential {
+			var list []interface{}
+			for i := 1; i < len(v.Array); i += 2 {
+				raw, err := valToInterface(v.Array[i])
+				if err != nil {
+					return nil, err
+				}
+				list = append(list, raw)
+			}
+			return json.Marshal(list)
+		} else {
+			m := make(map[string]interface{})
+			for i := 0; i < len(v.Array); i += 2 {
+				key := ToString(v.Array[i]).Str
+				val, err := valToInterface(v.Array[i+1])
+				if err != nil {
+					return nil, err
+				}
+				m[key] = val
+			}
+			return json.Marshal(m)
+		}
+	default:
+		return []byte("\"<Object>\""), nil
+	}
+}
+
+func valToInterface(v Val) (interface{}, error) {
+	switch v.Type {
+	case 0:
+		return nil, nil
+	case 1:
+		return v.Int, nil
+	case 2:
+		return v.Float, nil
+	case 3:
+		return v.Bool, nil
+	case 4:
+		return v.Str, nil
+	case 5:
+		isSequential := true
+		for i := 0; i < len(v.Array); i += 2 {
+			if v.Array[i].Type != 1 || v.Array[i].Int != int64(i/2) {
+				isSequential = false
+				break
+			}
+		}
+		if isSequential {
+			var list []interface{}
+			for i := 1; i < len(v.Array); i += 2 {
+				raw, err := valToInterface(v.Array[i])
+				if err != nil {
+					return nil, err
+				}
+				list = append(list, raw)
+			}
+			return list, nil
+		} else {
+			m := make(map[string]interface{})
+			for i := 0; i < len(v.Array); i += 2 {
+				key := ToString(v.Array[i]).Str
+				val, err := valToInterface(v.Array[i+1])
+				if err != nil {
+					return nil, err
+				}
+				m[key] = val
+			}
+			return m, nil
+		}
+	default:
+		return "<Object>", nil
+	}
+}
+
+func getMapVal(arr Val, key string) Val {
+	if arr.Type != 5 {
+		return Val{}
+	}
+	for i := 0; i < len(arr.Array); i += 2 {
+		if ToString(arr.Array[i]).Str == key {
+			return arr.Array[i+1]
+		}
+	}
+	return Val{}
+}
+
+type Route struct {
+	method     string
+	pattern    *regexp.Regexp
+	paramNames []string
+	handler    Val
+}
+
+type RouterObject struct {
+	routes        []Route
+	currentPrefix string
+}
+
+func (r *RouterObject) Get(prop string) Val { return Val{} }
+func (r *RouterObject) Set(prop string, val Val) {}
+func (r *RouterObject) Call(method string, args ...Val) (Val, error) {
+	switch method {
+	case "get", "post", "put", "delete":
+		if len(args) < 2 {
+			return Val{}, fmt.Errorf("Router::%s expects at least 2 arguments: path and handler", method)
+		}
+		path := ToString(args[0]).Str
+		handler := args[1]
+		r.addRoute(strings.ToUpper(method), path, handler)
+		return Val{Type: 9, Obj: r}, nil
+
+	case "group":
+		if len(args) < 2 {
+			return Val{}, fmt.Errorf("Router::group expects 2 arguments: prefix and callback")
+		}
+		prefix := ToString(args[0]).Str
+		callback := args[1]
+		
+		oldPrefix := r.currentPrefix
+		r.currentPrefix = oldPrefix + prefix
+		
+		Call(callback, Val{Type: 9, Obj: r})
+		
+		r.currentPrefix = oldPrefix
+		return Val{Type: 9, Obj: r}, nil
+	}
+	return Val{}, fmt.Errorf("undefined method: %s on Router", method)
+}
+
+func (r *RouterObject) addRoute(method, path string, handler Val) {
+	fullPath := r.currentPrefix + path
+	rePattern := "^"
+	var paramNames []string
+	
+	parts := strings.Split(fullPath, "/")
+	for idx, part := range parts {
+		if idx > 0 {
+			rePattern += "/"
+		}
+		if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+			paramName := part[1 : len(part)-1]
+			rePattern += fmt.Sprintf("(?P<%s>[^/]+)", paramName)
+			paramNames = append(paramNames, paramName)
+		} else {
+			rePattern += regexp.QuoteMeta(part)
+		}
+	}
+	rePattern += "$"
+	
+	re := regexp.MustCompile(rePattern)
+	r.routes = append(r.routes, Route{
+		method:     method,
+		pattern:    re,
+		paramNames: paramNames,
+		handler:    handler,
+	})
+}
+
+type CacheItem struct {
+	value      Val
+	expiration time.Time
+}
+
+type CacheObject struct {
+	mu    sync.RWMutex
+	items map[string]CacheItem
+}
+
+var globalCache = &CacheObject{items: make(map[string]CacheItem)}
+
+func (c *CacheObject) Get(prop string) Val { return Val{} }
+func (c *CacheObject) Set(prop string, val Val) {}
+func (c *CacheObject) Call(method string, args ...Val) (Val, error) {
+	switch method {
+	case "get":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("Cache::get expects 1 argument")
+		}
+		key := ToString(args[0]).Str
+		
+		c.mu.RLock()
+		item, exists := c.items[key]
+		c.mu.RUnlock()
+		
+		if !exists {
+			return Val{}, nil
+		}
+		if !item.expiration.IsZero() && time.Now().After(item.expiration) {
+			c.mu.Lock()
+			delete(c.items, key)
+			c.mu.Unlock()
+			return Val{}, nil
+		}
+		return item.value, nil
+
+	case "set":
+		if len(args) < 2 {
+			return Val{}, fmt.Errorf("Cache::set expects at least 2 arguments")
+		}
+		key := ToString(args[0]).Str
+		val := args[1]
+		ttl := int64(0)
+		if len(args) > 2 {
+			ttl = args[2].Int
+		}
+		
+		var exp time.Time
+		if ttl > 0 {
+			exp = time.Now().Add(time.Duration(ttl) * time.Second)
+		}
+		
+		c.mu.Lock()
+		c.items[key] = CacheItem{
+			value:      val,
+			expiration: exp,
+		}
+		c.mu.Unlock()
+		return Val{Type: 3, Bool: true}, nil
+
+	case "delete":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("Cache::delete expects 1 argument")
+		}
+		key := ToString(args[0]).Str
+		
+		c.mu.Lock()
+		delete(c.items, key)
+		c.mu.Unlock()
+		return Val{Type: 3, Bool: true}, nil
+	}
+	return Val{}, fmt.Errorf("undefined method: %s on Cache", method)
+}
+
+type HTTPRequestObject struct {
+	req        *http.Request
+	body       string
+	pathParams map[string]string
+}
+
+func (r *HTTPRequestObject) Get(prop string) Val { return Val{} }
+func (r *HTTPRequestObject) Set(prop string, val Val) {}
+func (r *HTTPRequestObject) Call(method string, args ...Val) (Val, error) {
+	switch method {
+	case "getMethod":
+		return NewStr(r.req.Method), nil
+	case "getUri":
+		return NewStr(r.req.RequestURI), nil
+	case "getPath":
+		return NewStr(r.req.URL.Path), nil
+	case "getBody":
+		return NewStr(r.body), nil
+	case "getHeaders":
+		var pairs []Val
+		for name, values := range r.req.Header {
+			if len(values) > 0 {
+				pairs = append(pairs, NewStr(name), NewStr(values[0]))
+			}
+		}
+		return NewAssociativeArray(pairs...), nil
+	case "getQuery":
+		var pairs []Val
+		for name, values := range r.req.URL.Query() {
+			if len(values) > 0 {
+				pairs = append(pairs, NewStr(name), NewStr(values[0]))
+			}
+		}
+		return NewAssociativeArray(pairs...), nil
+	case "getPost":
+		_ = r.req.ParseForm()
+		var pairs []Val
+		for name, values := range r.req.PostForm {
+			if len(values) > 0 {
+				pairs = append(pairs, NewStr(name), NewStr(values[0]))
+			}
+		}
+		return NewAssociativeArray(pairs...), nil
+	case "getParam":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("HTTPRequest::getParam expects 1 argument")
+		}
+		paramName := ToString(args[0]).Str
+		val, exists := r.pathParams[paramName]
+		if !exists {
+			return Val{}, nil
+		}
+		return NewStr(val), nil
+	}
+	return Val{}, fmt.Errorf("undefined method: %s on HTTPRequest", method)
+}
+
+type HTTPResponseObject struct {
+	w             http.ResponseWriter
+	status        int
+	ended         bool
+	headerWritten bool
+}
+
+func (r *HTTPResponseObject) writeHeader() {
+	if !r.headerWritten {
+		r.w.WriteHeader(r.status)
+		r.headerWritten = true
+	}
+}
+
+func (r *HTTPResponseObject) Get(prop string) Val { return Val{} }
+func (r *HTTPResponseObject) Set(prop string, val Val) {}
+func (r *HTTPResponseObject) Call(method string, args ...Val) (Val, error) {
+	switch method {
+	case "status":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("HTTPResponse::status expects 1 argument")
+		}
+		r.status = int(args[0].Int)
+		return Val{Type: 9, Obj: r}, nil
+
+	case "header":
+		if len(args) < 2 {
+			return Val{}, fmt.Errorf("HTTPResponse::header expects 2 arguments")
+		}
+		name := ToString(args[0]).Str
+		value := ToString(args[1]).Str
+		r.w.Header().Set(name, value)
+		return Val{Type: 9, Obj: r}, nil
+
+	case "write":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("HTTPResponse::write expects 1 argument")
+		}
+		if r.ended {
+			return Val{}, fmt.Errorf("HTTPResponse already ended")
+		}
+		r.writeHeader()
+		content := ToString(args[0]).Str
+		r.w.Write([]byte(content))
+		return Val{Type: 9, Obj: r}, nil
+
+	case "end":
+		if r.ended {
+			return Val{}, nil
+		}
+		r.writeHeader()
+		if len(args) > 0 {
+			content := ToString(args[0]).Str
+			r.w.Write([]byte(content))
+		}
+		r.ended = true
+		return Val{}, nil
+
+	case "json":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("HTTPResponse::json expects 1 argument")
+		}
+		if r.ended {
+			return Val{}, fmt.Errorf("HTTPResponse already ended")
+		}
+		jsonVal := args[0]
+		jsonData, err := valToJSON(jsonVal)
+		if err != nil {
+			return Val{}, err
+		}
+		r.w.Header().Set("Content-Type", "application/json")
+		r.writeHeader()
+		r.w.Write(jsonData)
+		r.ended = true
+		return Val{}, nil
+	}
+	return Val{}, fmt.Errorf("undefined method: %s on HTTPResponse", method)
+}
+
+type HTTPServerObject struct {
+	server        *http.Server
+	config        Val
+	middlewares   []Val
+	router        *RouterObject
+	dbPools       map[string]*sql.DB
+	dbPoolsDriver map[string]string
+	cacheClient   *CacheObject
+}
+
+func (s *HTTPServerObject) Get(prop string) Val { return Val{} }
+func (s *HTTPServerObject) Set(prop string, val Val) {}
+func (s *HTTPServerObject) Call(method string, args ...Val) (Val, error) {
+	if s.dbPools == nil {
+		s.dbPools = make(map[string]*sql.DB)
+		s.dbPoolsDriver = make(map[string]string)
+	}
+	switch method {
+	case "configure":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("HTTPServer::configure expects 1 argument")
+		}
+		s.config = args[0]
+		return Val{Type: 9, Obj: s}, nil
+
+	case "use":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("HTTPServer::use expects 1 argument")
+		}
+		s.middlewares = append(s.middlewares, args[0])
+		return Val{Type: 9, Obj: s}, nil
+
+	case "router":
+		if s.router == nil {
+			s.router = &RouterObject{}
+		}
+		return Val{Type: 9, Obj: s.router}, nil
+
+	case "database":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("HTTPServer::database expects 1 argument")
+		}
+		config := args[0]
+		if config.Type != 5 {
+			return Val{}, fmt.Errorf("HTTPServer::database config must be an array")
+		}
+		for i := 0; i < len(config.Array); i += 2 {
+			poolName := ToString(config.Array[i]).Str
+			dbConfig := config.Array[i+1]
+			if dbConfig.Type != 5 {
+				continue
+			}
+			driver := getMapVal(dbConfig, "driver").Str
+			host := getMapVal(dbConfig, "host").Str
+			user := getMapVal(dbConfig, "user").Str
+			password := getMapVal(dbConfig, "password").Str
+			dbName := getMapVal(dbConfig, "database").Str
+			if dbName == "" {
+				dbName = getMapVal(dbConfig, "dbname").Str
+			}
+			if user == "" {
+				user = "root"
+			}
+			
+			var dsn string
+			var dbConn *sql.DB
+			var err error
+			
+			if driver == "mysql" {
+				dsn = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true", user, password, host, dbName)
+				dbConn, err = sql.Open("mysql", dsn)
+			} else if driver == "postgres" || driver == "postgresql" {
+				dsn = fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", user, password, host, dbName)
+				dbConn, err = sql.Open("postgres", dsn)
+			} else {
+				return Val{}, fmt.Errorf("unsupported database driver: %s", driver)
+			}
+			
+			if err != nil {
+				return Val{}, err
+			}
+			
+			poolSize := int64(10)
+			poolSizeVal := getMapVal(dbConfig, "pool_size")
+			if poolSizeVal.Type == 1 {
+				poolSize = poolSizeVal.Int
+			}
+			dbConn.SetMaxOpenConns(int(poolSize))
+			dbConn.SetMaxIdleConns(int(poolSize))
+			
+			s.dbPools[poolName] = dbConn
+			s.dbPoolsDriver[poolName] = driver
+		}
+		return Val{Type: 9, Obj: s}, nil
+
+	case "db":
+		name := "default"
+		if len(args) > 0 {
+			name = ToString(args[0]).Str
+		}
+		conn, exists := s.dbPools[name]
+		if !exists {
+			return Val{}, fmt.Errorf("database pool %s not configured", name)
+		}
+		driver := s.dbPoolsDriver[name]
+		if driver == "mysql" {
+			return Val{Type: 9, Obj: &MySQLObject{dbConn: conn, connected: true}}, nil
+		} else {
+			return Val{Type: 9, Obj: &PostgresObject{dbConn: conn, connected: true}}, nil
+		}
+
+	case "cache":
+		if s.cacheClient == nil {
+			s.cacheClient = globalCache
+		}
+		if len(args) > 0 {
+			return Val{Type: 9, Obj: s}, nil
+		}
+		return Val{Type: 9, Obj: s.cacheClient}, nil
+
+	case "listen":
+		if len(args) < 1 {
+			return Val{}, fmt.Errorf("HTTPServer::listen expects at least 1 argument: port")
+		}
+		port := int(args[0].Int)
+		
+		mux := http.NewServeMux()
+		
+		if len(args) >= 2 && (args[1].Type == 8 && args[1].Func != nil) {
+			callback := args[1]
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				var bodyBytes []byte
+				if r.Body != nil {
+					bodyBytes, _ = io.ReadAll(r.Body)
+					r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+				}
+				reqObj := &HTTPRequestObject{
+					req:        r,
+					body:       string(bodyBytes),
+					pathParams: make(map[string]string),
+				}
+				resObj := &HTTPResponseObject{
+					w:      w,
+					status: http.StatusOK,
+				}
+				callback.Func(Val{Type: 9, Obj: reqObj}, Val{Type: 9, Obj: resObj})
+				if !resObj.ended {
+					resObj.writeHeader()
+					resObj.ended = true
+				}
+			})
+		} else {
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				var bodyBytes []byte
+				if r.Body != nil {
+					bodyBytes, _ = io.ReadAll(r.Body)
+					r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+				}
+				reqObj := &HTTPRequestObject{
+					req:        r,
+					body:       string(bodyBytes),
+					pathParams: make(map[string]string),
+				}
+				resObj := &HTTPResponseObject{
+					w:      w,
+					status: http.StatusOK,
+				}
+
+				var runNext func(idx int, currentReq Val) Val
+				runNext = func(idx int, currentReq Val) Val {
+					if idx >= len(s.middlewares) {
+						return s.dispatchRoute(currentReq, Val{Type: 9, Obj: resObj})
+					}
+
+					middleware := s.middlewares[idx]
+					nextFunc := Val{Type: 8, Func: func(args ...Val) Val {
+						nextReq := currentReq
+						if len(args) > 0 {
+							nextReq = args[0]
+						}
+						return runNext(idx+1, nextReq)
+					}}
+
+					resVal := Val{Type: 9, Obj: resObj}
+					if middleware.Type == 8 {
+						return Call(middleware, currentReq, resVal, nextFunc)
+					} else if middleware.Type == 4 {
+						obj := NewObject(middleware.Str)
+						if obj.Type == 9 && obj.Obj != nil {
+							if pObj, ok := obj.Obj.(*PHXObject); ok {
+								if _, hasHandle := pObj.Methods["handle"]; hasHandle {
+									return CallMethod(obj, "handle", currentReq, resVal, nextFunc)
+								}
+								if _, hasInvoke := pObj.Methods["__invoke"]; hasInvoke {
+									return CallMethod(obj, "__invoke", currentReq, resVal, nextFunc)
+								}
+							}
+						}
+					}
+					return runNext(idx+1, currentReq)
+				}
+
+				_ = runNext(0, Val{Type: 9, Obj: reqObj})
+
+				if !resObj.ended {
+					resObj.writeHeader()
+					resObj.ended = true
+				}
+			})
+		}
+
+		addr := fmt.Sprintf(":%d", port)
+		s.server = &http.Server{
+			Addr:    addr,
+			Handler: mux,
+		}
+		
+		fmt.Printf("PHX Server listening on http://localhost:%d\n", port)
+		err := s.server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			return Val{}, err
+		}
+		return Val{Type: 3, Bool: true}, nil
+	}
+	return Val{}, fmt.Errorf("undefined method: %s on HTTPServer", method)
+}
+
+func (s *HTTPServerObject) dispatchRoute(reqVal, resVal Val) Val {
+	reqObj := reqVal.Obj.(*HTTPRequestObject)
+	resObj := resVal.Obj.(*HTTPResponseObject)
+	
+	if s.router == nil {
+		resObj.status = http.StatusNotFound
+		resObj.ended = true
+		resObj.w.WriteHeader(http.StatusNotFound)
+		resObj.w.Write([]byte("Not Found - No Router"))
+		return Val{}
+	}
+	
+	method := reqObj.req.Method
+	path := reqObj.req.URL.Path
+	
+	for _, route := range s.router.routes {
+		if route.method == method && route.pattern.MatchString(path) {
+			matches := route.pattern.FindStringSubmatch(path)
+			for i, name := range route.pattern.SubexpNames() {
+				if i > 0 && name != "" {
+					reqObj.pathParams[name] = matches[i]
+				}
+			}
+			
+			handler := route.handler
+			if handler.Type == 8 {
+				var args []Val
+				args = append(args, reqVal, resVal)
+				for _, pName := range route.paramNames {
+					args = append(args, NewStr(reqObj.pathParams[pName]))
+				}
+				return Call(handler, args...)
+			} else if handler.Type == 4 {
+				parts := strings.Split(handler.Str, "@")
+				if len(parts) == 2 {
+					className := parts[0]
+					methodName := parts[1]
+					obj := NewObject(className)
+					var args []Val
+					args = append(args, reqVal, resVal)
+					for _, pName := range route.paramNames {
+						args = append(args, NewStr(reqObj.pathParams[pName]))
+					}
+					return CallMethod(obj, methodName, args...)
+				}
+			}
+		}
+	}
+	
+	resObj.status = http.StatusNotFound
+	resObj.ended = true
+	resObj.w.WriteHeader(http.StatusNotFound)
+	resObj.w.Write([]byte("Not Found"))
+	return Val{}
+}
 
 var classes = make(map[string]map[string]Val)
 `
