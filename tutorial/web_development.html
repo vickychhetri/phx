@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Development & MVC Guide - PHX Developer Guide</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #030712;
+            --sidebar-bg: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.06);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-grad: linear-gradient(135deg, #a78bfa, #f472b6);
+            --code-bg: #090d16;
+            --code-border: rgba(139, 92, 246, 0.15);
+            --highlight: #1e1b4b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            display: flex;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-purple);
+        }
+
+        /* Sidebar navigation */
+        aside {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 30px 20px;
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 35px;
+            padding-left: 10px;
+        }
+
+        .logo-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .logo-sub {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-left: 8px;
+            border: 1px solid var(--accent-purple);
+            padding: 1px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 15px;
+            padding-left: 10px;
+            margin-top: 20px;
+        }
+
+        aside ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        aside a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 10px 14px;
+            border-radius: 8px;
+            display: block;
+            transition: all 0.2s ease-in-out;
+            border-left: 3px solid transparent;
+        }
+
+        aside a:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        aside li.active a, aside a.active {
+            color: #ffffff;
+            background: rgba(139, 92, 246, 0.1);
+            border-left-color: var(--accent-purple);
+        }
+
+        /* Main Content area */
+        main {
+            margin-left: 280px;
+            flex-grow: 1;
+            padding: 50px 80px;
+            max-width: 1100px;
+            position: relative;
+        }
+
+        header {
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin-bottom: 10px;
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-desc {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+        }
+
+        /* Section layout */
+        section {
+            margin-bottom: 60px;
+            scroll-margin-top: 40px;
+        }
+
+        .section-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .section-card:hover {
+            border-color: rgba(139, 92, 246, 0.2);
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 24px;
+            background: var(--accent-grad);
+            border-radius: 2px;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 30px;
+            margin-bottom: 12px;
+            color: #ffffff;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            font-size: 0.975rem;
+        }
+
+        /* Lists */
+        ul.square-list {
+            list-style: none;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        ul.square-list li {
+            position: relative;
+            padding-left: 20px;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        ul.square-list li::before {
+            content: "▪";
+            position: absolute;
+            left: 0;
+            color: var(--accent-purple);
+            font-size: 1.1rem;
+            top: -2px;
+        }
+
+        /* Code Block formatting */
+        pre {
+            background-color: var(--code-bg);
+            border: 1px solid var(--code-border);
+            border-radius: 10px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Inline code */
+        p code, li code {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: var(--accent-pink);
+            font-size: 0.85em;
+        }
+
+        .highlight-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            bottom: 0;
+            background: var(--accent-grad);
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+        }
+
+        .alert-box {
+            background-color: rgba(139, 92, 246, 0.05);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* API Reference Table */
+        .api-table-container {
+            overflow-x: auto;
+            margin-top: 25px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+
+        table.api-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        table.api-table th {
+            background-color: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 18px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        table.api-table td {
+            border-bottom: 1px solid var(--border-color);
+            padding: 14px 18px;
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        table.api-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Responsive layout */
+        @media (max-width: 900px) {
+            body {
+                flex-direction: column;
+            }
+            aside {
+                width: 100%;
+                position: static;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                padding: 20px;
+            }
+            main {
+                margin-left: 0;
+                padding: 40px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="logo-container">
+            <div class="logo-text">PHX</div>
+            <div class="logo-sub">docs</div>
+        </div>
+        <div class="nav-title">Developer Guide</div>
+        <ul>
+            <li><a href="index.html">← Back to Language Reference</a></li>
+            <li><a href="getting_started.html">← Back to Basics Tutorial</a></li>
+        </ul>
+        <div class="nav-title">MVC Guide</div>
+        <ul>
+            <li class="active"><a href="#intro">1. Introduction to MVC</a></li>
+            <li><a href="#folders">2. Project Structure</a></li>
+            <li><a href="#db-setup">3. Database Setup</a></li>
+            <li><a href="#middleware">4. Auth Middleware</a></li>
+            <li><a href="#views">5. Creating Views</a></li>
+            <li><a href="#controllers">6. Controllers CRUD</a></li>
+            <li><a href="#routes">7. Routing Setup</a></li>
+        </ul>
+    </aside>
+
+    <main>
+        <header>
+            <h1>Web Development & MVC Guide</h1>
+            <p class="header-desc">Learn how to build production-grade web applications in PHX using the Model-View-Controller (MVC) architectural pattern.</p>
+        </header>
+
+        <!-- INTRODUCTION -->
+        <section id="intro">
+            <div class="section-card">
+                <h2>1. Introduction to MVC</h2>
+                <p>The Model-View-Controller pattern divides an application into three main components:</p>
+                <ul class="square-list">
+                    <li><strong>Model</strong>: Manages the data, database queries, and business rules (e.g. users, tasks).</li>
+                    <li><strong>View</strong>: Responsible for the visual presentation and layout of the interface (e.g. HTML pages, JSON formats).</li>
+                    <li><strong>Controller</strong>: Binds the application together. It processes incoming requests, interacts with the model, and selects a view to render.</li>
+                </ul>
+                <p>By keeping these components isolated, your web application remains scalable, easier to test, and highly maintainable as the codebase grows.</p>
+            </div>
+        </section>
+
+        <!-- FOLDERS -->
+        <section id="folders">
+            <div class="section-card">
+                <h2>2. Standard Project Structure</h2>
+                <p>For a production PHX application, we recommend organizing your files using the following layout:</p>
+                <pre><div class="highlight-bar"></div><code>my_app/
+├── index.php             # Main application bootstrap entry-point
+├── config/
+│   └── database.php      # DB connection pool setup & schema migrations
+├── middleware/
+│   ├── CORSMiddleware.php
+│   └── AuthMiddleware.php
+├── controllers/
+│   ├── AuthController.php
+│   └── TodoController.php
+├── views/
+│   ├── layout.php        # Common HTML layout (headers, footers)
+│   ├── login.php
+│   ├── signup.php
+│   └── dashboard.php
+└── routes/
+    └── web.php           # HTTP request routing definitions</code></pre>
+            </div>
+        </section>
+
+        <!-- DATABASE SETUP -->
+        <section id="db-setup">
+            <div class="section-card">
+                <h2>3. Database Connection & Schema Setup</h2>
+                <p>Inside <code>config/database.php</code>, we establish connection pools and define helper routines. We can write auto-migration blocks inside a <code>try-catch</code> statement to automatically create required database tables during server startup.</p>
+                
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// config/database.php
+
+$db_host = "127.0.0.1:3306";
+$db_user = "root";
+$db_pass = "MyNewPass@123";
+$db_name = "todo_app";
+
+// 1. Auto-migration / DB creation routine
+try {
+    $db = new MySQL();
+    echo "Connecting to MySQL for migration...\n";
+    $db->connect($db_host, $db_user, $db_pass, $db_name);
+    
+    // Create users table
+    $db->exec("CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL
+    ) ENGINE=InnoDB");
+    
+    // Create todos table
+    $db->exec("CREATE TABLE IF NOT EXISTS todos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        completed BOOLEAN NOT NULL DEFAULT FALSE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB");
+    
+    $db->close();
+    echo "Database successfully verified.\n";
+} catch (Exception $e) {
+    echo "Database Migration Error: " . $e->getMessage() . "\n";
+}
+
+// 2. Helper to fetch connection factory
+function get_db_connection() {
+    $conn = new MySQL();
+    $conn->connect("127.0.0.1:3306", "root", "MyNewPass@123", "todo_app");
+    return $conn;
+}
+
+// 3. Helper to escape inputs for raw SQL
+function db_escape($str) {
+    return str_replace("'", "''", $str);
+}
+?></code></pre>
+            </div>
+        </section>
+
+        <!-- MIDDLEWARE -->
+        <section id="middleware">
+            <div class="section-card">
+                <h2>4. Session Validation & Auth Middleware</h2>
+                <p>Authenticating client requests relies on parsing incoming cookies and looking up session identifiers in Cache. Below is how to implement cookie parsing and the <code>AuthMiddleware</code> component:</p>
+                
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// config/database.php (Session Helpers)
+
+function get_session_token($req) {
+    $headers = $req->getHeaders();
+    $cookieHeader = "";
+    if ($headers["Cookie"] !== null) {
+        $cookieHeader = $headers["Cookie"];
+    } else if ($headers["cookie"] !== null) {
+        $cookieHeader = $headers["cookie"];
+    }
+    
+    if ($cookieHeader === "") {
+        return "";
+    }
+    
+    $pos = strpos($cookieHeader, "session_token=");
+    if ($pos === false) {
+        return "";
+    }
+    
+    $tokenPart = substr($cookieHeader, $pos + 14);
+    $semi = strpos($tokenPart, ";");
+    if ($semi !== false) {
+        return substr($tokenPart, 0, $semi);
+    }
+    return $tokenPart;
+}
+
+function get_current_user_id($req) {
+    $token = get_session_token($req);
+    if ($token === "") {
+        return null;
+    }
+    $cache = new Cache();
+    return $cache->get("session:" . $token);
+}
+?></code></pre>
+
+                <p>Now, we implement the <code>AuthMiddleware</code> check, redirecting unauthenticated users to the <code>/login</code> path:</p>
+
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// middleware/AuthMiddleware.php
+
+class AuthMiddleware {
+    public function handle($req, $res, $next) {
+        $path = $req->getPath();
+        
+        // Exclude authentication paths from block check
+        $isAuthPath = false;
+        if ($path === "/login") {
+            $isAuthPath = true;
+        }
+        if ($path === "/signup") {
+            $isAuthPath = true;
+        }
+        if ($path === "/logout") {
+            $isAuthPath = true;
+        }
+        
+        if ($isAuthPath) {
+            return $next($req);
+        }
+        
+        // Validate session
+        $userId = get_current_user_id($req);
+        if ($userId === null) {
+            // Unauthenticated! Redirect to login page
+            $res->status(302)->header("Location", "/login")->end();
+            return null;
+        }
+        
+        return $next($req);
+    }
+}
+?></code></pre>
+            </div>
+        </section>
+
+        <!-- VIEWS -->
+        <section id="views">
+            <div class="section-card">
+                <h2>5. Creating Dynamic Views & Layouts</h2>
+                <p>Views receive variables from controllers and output structured HTML templates. To maintain consistency, we first create a base layout manager:</p>
+                
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// views/layout.php
+
+class Layout {
+    public function render($title, $content) {
+        return "&lt;!DOCTYPE html&gt;
+&lt;html lang='en'&gt;
+&lt;head&gt;
+    &lt;meta charset='UTF-8'&gt;
+    &lt;title&gt;" . $title . " - PHX Todo&lt;/title&gt;
+    &lt;style&gt;
+        body { font-family: sans-serif; background: #121212; color: #fff; }
+        .container { max-width: 600px; margin: 50px auto; padding: 20px; }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div class='container'&gt;" . $content . "&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;";
+    }
+}
+?></code></pre>
+
+                <p>Now, we build a specific template (like the Dashboard) that constructs the view payload and wraps it within the Layout:</p>
+
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// views/dashboard.php
+
+class DashboardView {
+    public function render($todos, $username) {
+        $total = count($todos);
+        
+        $content = "&lt;h1&gt;Welcome back, " . $username . "!&lt;/h1&gt;
+        &lt;p&gt;You have " . $total . " tasks pending.&lt;/p&gt;
+        
+        &lt;form action='/todos/add' method='POST'&gt;
+            &lt;input type='text' name='title' placeholder='Add a new task...' required&gt;
+            &lt;button type='submit'&gt;Add&lt;/button&gt;
+        &lt;/form&gt;
+        &lt;ul&gt;";
+        
+        for ($i = 0; $i &lt; $total; $i++) {
+            $t = $todos[$i];
+            $content = $content . "&lt;li&gt;" . $t["title"] . " &lt;a href='/todos/delete/" . $t["id"] . "'&gt;[Delete]&lt;/a&gt;&lt;/li&gt;";
+        }
+        
+        $content = $content . "&lt;/ul&gt;
+        &lt;p&gt;&lt;a href='/logout'&gt;Logout&lt;/a&gt;&lt;/p&gt;";
+        
+        $layout = new Layout();
+        return $layout->render("Dashboard", $content);
+    }
+}
+?></code></pre>
+            </div>
+        </section>
+
+        <!-- CONTROLLERS -->
+        <section id="controllers">
+            <div class="section-card">
+                <h2>6. Controllers & CRUD Operations</h2>
+                <p>Controllers contain methods that query the database, process values, and output responses. Here is an example controller handling Todo CRUD operations:</p>
+                
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// controllers/TodoController.php
+
+class TodoController {
+    public function showDashboard($req, $res) {
+        $userId = get_current_user_id($req);
+        
+        // Fetch current user details
+        $db = get_db_connection();
+        $userRows = $db->query("SELECT username FROM users WHERE id = " . $userId);
+        $username = "Developer";
+        if (count($userRows) > 0) {
+            $username = $userRows[0]["username"];
+        }
+        
+        // Fetch user todos
+        $todos = $db->query("SELECT id, title, completed FROM todos WHERE user_id = " . $userId . " ORDER BY id DESC");
+        $db->close();
+        
+        $view = new DashboardView();
+        $html = $view->render($todos, $username);
+        $res->status(200)->header("Content-Type", "text/html")->end($html);
+    }
+    
+    public function addTodo($req, $res) {
+        $userId = get_current_user_id($req);
+        $post = $req->getPost();
+        
+        $title = "";
+        if (count($post) > 0) {
+            if ($post["title"] !== null) {
+                $title = trim($post["title"]);
+            }
+        }
+        
+        if ($title !== "") {
+            $db = get_db_connection();
+            $titleEscaped = db_escape($title);
+            $db->exec("INSERT INTO todos (user_id, title, completed) VALUES (" . $userId . ", '" . $titleEscaped . "', false)");
+            $db->close();
+        }
+        
+        $res->status(302)->header("Location", "/dashboard")->end();
+    }
+
+    public function deleteTodo($req, $res, $id) {
+        $userId = get_current_user_id($req);
+        
+        $db = get_db_connection();
+        $db->exec("DELETE FROM todos WHERE id = " . $id . " AND user_id = " . $userId);
+        $db->close();
+        
+        $res->status(302)->header("Location", "/dashboard")->end();
+    }
+}
+?></code></pre>
+            </div>
+        </section>
+
+        <!-- ROUTING SETUP -->
+        <section id="routes">
+            <div class="section-card">
+                <h2>7. Routing & Server Bootstrapping</h2>
+                <p>Finally, we define the application endpoints in `routes/web.php` and mount the router and middlewares inside the bootstrap index file.</p>
+                
+                <h3>Route Definitions File</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// routes/web.php
+
+$router = $server->router();
+
+// Root route redirects based on session state
+$router->get("/", function($req, $res) {
+    $userId = get_current_user_id($req);
+    if ($userId !== null) {
+        $res->status(302)->header("Location", "/dashboard")->end();
+    } else {
+        $res->status(302)->header("Location", "/login")->end();
+    }
+});
+
+// Authentication routes
+$auth = new AuthController();
+$router->get("/login", [$auth, "showLogin"]);
+$router->post("/login", [$auth, "login"]);
+$router->get("/signup", [$auth, "showSignup"]);
+$router->post("/signup", [$auth, "signup"]);
+$router->get("/logout", [$auth, "logout"]);
+
+// Todo routes
+$todo = new TodoController();
+$router->get("/dashboard", [$todo, "showDashboard"]);
+$router->post("/todos/add", [$todo, "addTodo"]);
+$router->get("/todos/delete/{id}", [$todo, "deleteTodo"]);
+?></code></pre>
+
+                <h3>App Bootstrap File</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// index.php
+
+// 1. Instantiate Server
+$server = new HttpServer();
+$server->configure([
+    "workers" => 8,
+    "max_connections" => 10000
+]);
+
+// 2. Include configurations, views, controllers
+include "config/database.php";
+include "views/layout.php";
+include "views/dashboard.php";
+include "views/login.php";
+include "views/signup.php";
+include "controllers/AuthController.php";
+include "controllers/TodoController.php";
+
+// 3. Mount Middlewares
+$server->use("CORSMiddleware");
+$server->use("AuthMiddleware");
+
+// 4. Load Router Routes
+include "routes/web.php";
+
+// 5. Start listening
+echo "PHX Server starting on port 8086...\n";
+$server->listen(8086);
+?></code></pre>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Scrollspy to highlight active sidebar nav item
+        const links = document.querySelectorAll('aside a');
+        const sections = document.querySelectorAll('section');
+
+        function changeLinkState() {
+            let index = sections.length;
+
+            while(--index && window.scrollY + 100 < sections[index].offsetTop) {}
+            
+            links.forEach((link) => link.classList.remove('active'));
+            if (index >= 0) {
+                // Ensure we skip the external reference link checking
+                const navLinks = Array.from(links).filter(link => link.getAttribute('href').startsWith('#'));
+                navLinks.forEach((link) => link.classList.remove('active'));
+                
+                const currentId = '#' + sections[index].id;
+                const activeLink = Array.from(links).find(link => link.getAttribute('href') === currentId);
+                if (activeLink) {
+                    activeLink.classList.add('active');
+                }
+            }
+        }
+
+        changeLinkState();
+        window.addEventListener('scroll', changeLinkState);
+    </script>
+</body>
+</html>

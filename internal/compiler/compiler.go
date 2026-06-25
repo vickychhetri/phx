@@ -965,7 +965,7 @@ func isBuiltin(name string) bool {
 	case "count", "microtime", "channel", "send", "receive", "spawn", "intdiv",
 		"sleep", "print_r", "strtoupper", "strtolower", "str_repeat", "trim",
 		"str_replace", "number_format", "strlen", "strpos", "substr", "readline",
-		"intval", "floatval", "strval", "abs", "min", "max":
+		"intval", "floatval", "strval", "abs", "min", "max", "rand":
 		return true
 	}
 	return false
@@ -1761,6 +1761,9 @@ func Eq(a, b Val) Val {
 	if a.Type == 2 || b.Type == 2 {
 		return Val{Type: 3, Bool: toF(a) == toF(b)}
 	}
+	if a.Type != b.Type {
+		return Val{Type: 3, Bool: false}
+	}
 	return Val{Type: 3, Bool: a.Int == b.Int}
 }
 
@@ -2227,6 +2230,21 @@ var max = Val{Type: 8, Func: func(args ...Val) Val {
 		}
 	}
 	return res
+}}
+
+var rand = Val{Type: 8, Func: func(args ...Val) Val {
+	minVal := int64(0)
+	maxVal := int64(2147483647)
+	if len(args) >= 2 {
+		minVal = args[0].Int
+		maxVal = args[1].Int
+	}
+	if minVal >= maxVal {
+		return NewInt(minVal)
+	}
+	n := time.Now().UnixNano()
+	r := minVal + (n % (maxVal - minVal + 1))
+	return NewInt(r)
 }}
 
 var intdiv = Val{Type: 8, Func: func(args ...Val) Val {
