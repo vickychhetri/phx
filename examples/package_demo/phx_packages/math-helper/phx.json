@@ -1,0 +1,7 @@
+{
+  "name": "math-helper",
+  "version": "1.0.0",
+  "description": "A math helper library providing basic mathematical operations for PHX",
+  "main": "src/Math.php",
+  "dependencies": {}
+}

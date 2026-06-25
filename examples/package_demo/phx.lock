@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "logger": {
+      "version": "1.0.0",
+      "resolved": "/home/vicky/.phx_registry/logger/logger-1.0.0.zip"
+    },
+    "math-helper": {
+      "version": "1.0.0",
+      "resolved": "/home/vicky/.phx_registry/math-helper/math-helper-1.0.0.zip"
+    },
+    "string-helper": {
+      "version": "1.0.0",
+      "resolved": "/home/vicky/.phx_registry/string-helper/string-helper-1.0.0.zip"
+    }
+  }
+}

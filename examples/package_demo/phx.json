@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "logger": "^1.0.0",
+    "math-helper": "^1.0.0",
+    "string-helper": "^1.0.0"
+  },
+  "description": "",
+  "main": "index.php",
+  "name": "package_demo",
+  "version": "1.0.0"
+}
