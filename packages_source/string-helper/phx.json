@@ -1,0 +1,7 @@
+{
+  "name": "string-helper",
+  "version": "1.0.0",
+  "description": "A string utility library for PHX",
+  "main": "src/Str.php",
+  "dependencies": {}
+}

@@ -1,0 +1,7 @@
+{
+  "name": "logger",
+  "version": "1.0.0",
+  "description": "A basic console logger package for PHX developers",
+  "main": "src/Logger.php",
+  "dependencies": {}
+}

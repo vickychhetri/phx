@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"phx/internal/ast"
 	"phx/internal/lexer"
 	"phx/internal/parser"
@@ -15,6 +17,7 @@ type Compiler struct {
 	capturedVars []map[string]string
 	inTryCatch   bool
 	inFunction   bool
+	dirStack     []string
 }
 
 func New() *Compiler {
@@ -22,36 +25,37 @@ func New() *Compiler {
 		capturedVars: make([]map[string]string, 0),
 		inTryCatch:   false,
 		inFunction:   false,
+		dirStack:     make([]string, 0),
 	}
 }
 
-func hasTryCatch(node ast.Node) bool {
+func (c *Compiler) hasTryCatch(node ast.Node) bool {
 	if node == nil {
 		return false
 	}
 	switch n := node.(type) {
 	case *ast.Program:
 		for _, stmt := range n.Statements {
-			if hasTryCatch(stmt) {
+			if c.hasTryCatch(stmt) {
 				return true
 			}
 		}
 	case *ast.BlockStatement:
 		for _, stmt := range n.Statements {
-			if hasTryCatch(stmt) {
+			if c.hasTryCatch(stmt) {
 				return true
 			}
 		}
 	case *ast.ExpressionStatement:
-		return hasTryCatch(n.Expression)
+		return c.hasTryCatch(n.Expression)
 	case *ast.IfStatement:
-		return hasTryCatch(n.Condition) || hasTryCatch(n.Consequence) || hasTryCatch(n.Alternative)
+		return c.hasTryCatch(n.Condition) || c.hasTryCatch(n.Consequence) || c.hasTryCatch(n.Alternative)
 	case *ast.ForStatement:
-		return hasTryCatch(n.Init) || hasTryCatch(n.Condition) || hasTryCatch(n.Post) || hasTryCatch(n.Body)
+		return c.hasTryCatch(n.Init) || c.hasTryCatch(n.Condition) || c.hasTryCatch(n.Post) || c.hasTryCatch(n.Body)
 	case *ast.WhileStatement:
-		return hasTryCatch(n.Condition) || hasTryCatch(n.Body)
+		return c.hasTryCatch(n.Condition) || c.hasTryCatch(n.Body)
 	case *ast.DoWhileStatement:
-		return hasTryCatch(n.Condition) || hasTryCatch(n.Body)
+		return c.hasTryCatch(n.Condition) || c.hasTryCatch(n.Body)
 	case *ast.TryCatchStatement:
 		return true
 	case *ast.IncludeStatement:
@@ -60,7 +64,21 @@ func hasTryCatch(node ast.Node) bool {
 			return false
 		}
 		filename := strLit.Value
-		content, err := ioutil.ReadFile(filename)
+		resolvedPath := filename
+		if !filepath.IsAbs(filename) {
+			if len(c.dirStack) > 0 {
+				p := filepath.Join(c.dirStack[len(c.dirStack)-1], filename)
+				if _, err := os.Stat(p); err == nil {
+					resolvedPath = p
+				} else if len(c.dirStack) > 1 {
+					p2 := filepath.Join(c.dirStack[0], filename)
+					if _, err := os.Stat(p2); err == nil {
+						resolvedPath = p2
+					}
+				}
+			}
+		}
+		content, err := ioutil.ReadFile(resolvedPath)
 		if err != nil {
 			return false
 		}
@@ -70,12 +88,17 @@ func hasTryCatch(node ast.Node) bool {
 		if len(p.Errors()) > 0 {
 			return false
 		}
-		return hasTryCatch(prog)
+		c.dirStack = append(c.dirStack, filepath.Dir(resolvedPath))
+		res := c.hasTryCatch(prog)
+		c.dirStack = c.dirStack[:len(c.dirStack)-1]
+		return res
 	}
 	return false
 }
 
-func (c *Compiler) Compile(program *ast.Program) (string, error) {
+func (c *Compiler) Compile(program *ast.Program, mainFilePath string) (string, error) {
+	c.dirStack = []string{filepath.Dir(mainFilePath)}
+
 	var buf bytes.Buffer
 	buf.WriteString(goHeader)
 
@@ -106,7 +129,7 @@ func (c *Compiler) Compile(program *ast.Program) (string, error) {
 		}
 	}()
 `)
-	if hasTryCatch(program) {
+	if c.hasTryCatch(program) {
 		buf.WriteString("\tvar isReturn bool\n")
 		buf.WriteString("\tvar returnVal Val\n")
 		buf.WriteString("\t_, _ = isReturn, returnVal\n")
@@ -516,7 +539,7 @@ func (c *Compiler) compileNode(node ast.Node) string {
 			}
 		}
 
-		if hasTryCatch(n.Body) {
+		if c.hasTryCatch(n.Body) {
 			buf.WriteString("\t\tvar isReturn bool\n")
 			buf.WriteString("\t\tvar returnVal Val\n")
 			buf.WriteString("\t\t_, _ = isReturn, returnVal\n")
@@ -582,7 +605,7 @@ func (c *Compiler) compileNode(node ast.Node) string {
 					buf.WriteString(fmt.Sprintf("\t\t_ = %s\n", name))
 				}
 			}
-			if hasTryCatch(m.Body) {
+			if c.hasTryCatch(m.Body) {
 				buf.WriteString("\t\tvar isReturn bool\n")
 				buf.WriteString("\t\tvar returnVal Val\n")
 				buf.WriteString("\t\t_, _ = isReturn, returnVal\n")
@@ -700,7 +723,7 @@ func (c *Compiler) compileNode(node ast.Node) string {
 				buf.WriteString(fmt.Sprintf("\t\t_ = %s\n", name))
 			}
 		}
-		if hasTryCatch(n.Body) {
+		if c.hasTryCatch(n.Body) {
 			buf.WriteString("\t\tvar isReturn bool\n")
 			buf.WriteString("\t\tvar returnVal Val\n")
 			buf.WriteString("\t\t_, _ = isReturn, returnVal\n")
@@ -764,7 +787,21 @@ func (c *Compiler) compileNode(node ast.Node) string {
 			return "/* include with non-string literal expression is unsupported in compiled mode */"
 		}
 		filename := strLit.Value
-		content, err := ioutil.ReadFile(filename)
+		resolvedPath := filename
+		if !filepath.IsAbs(filename) {
+			if len(c.dirStack) > 0 {
+				p := filepath.Join(c.dirStack[len(c.dirStack)-1], filename)
+				if _, err := os.Stat(p); err == nil {
+					resolvedPath = p
+				} else if len(c.dirStack) > 1 {
+					p2 := filepath.Join(c.dirStack[0], filename)
+					if _, err := os.Stat(p2); err == nil {
+						resolvedPath = p2
+					}
+				}
+			}
+		}
+		content, err := ioutil.ReadFile(resolvedPath)
 		if err != nil {
 			return fmt.Sprintf("panic(\"failed to read include file: %s\")", filename)
 		}
@@ -774,10 +811,12 @@ func (c *Compiler) compileNode(node ast.Node) string {
 		if len(p.Errors()) > 0 {
 			return fmt.Sprintf("panic(\"parser errors in include file: %s\")", filename)
 		}
+		c.dirStack = append(c.dirStack, filepath.Dir(resolvedPath))
 		var buf bytes.Buffer
 		for _, stmt := range prog.Statements {
 			buf.WriteString(c.compileNode(stmt) + "\n")
 		}
+		c.dirStack = c.dirStack[:len(c.dirStack)-1]
 		return buf.String()
 
 	default:

@@ -12,6 +12,7 @@ import (
 	"phx/internal/compiler"
 	"phx/internal/lexer"
 	"phx/internal/parser"
+	"phx/internal/pm"
 	"phx/internal/vm"
 )
 
@@ -112,6 +113,57 @@ func main() {
 		filePath := os.Args[2]
 		runInterpreter(filePath)
 
+	case "package", "pkg":
+		if len(os.Args) < 3 {
+			printPackageUsage()
+			os.Exit(1)
+		}
+		subcommand := os.Args[2]
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Printf("Error getting current working directory: %v\n", err)
+			os.Exit(1)
+		}
+		switch subcommand {
+		case "init":
+			yes := false
+			if len(os.Args) > 3 && (os.Args[3] == "-y" || os.Args[3] == "--yes") {
+				yes = true
+			}
+			err = pm.Init(cwd, yes)
+		case "add":
+			if len(os.Args) < 4 {
+				fmt.Println("Usage: phx package add <package-name> [constraint]")
+				os.Exit(1)
+			}
+			pkgName := os.Args[3]
+			constraint := ""
+			if len(os.Args) > 4 {
+				constraint = os.Args[4]
+			}
+			err = pm.Add(cwd, pkgName, constraint)
+		case "install":
+			err = pm.Install(cwd, false)
+		case "update":
+			err = pm.Update(cwd)
+		case "publish":
+			err = pm.Publish(cwd)
+		case "search":
+			query := ""
+			if len(os.Args) > 3 {
+				query = os.Args[3]
+			}
+			err = pm.Search(query)
+		default:
+			fmt.Printf("Unknown package subcommand: %q\n", subcommand)
+			printPackageUsage()
+			os.Exit(1)
+		}
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+
 	case "help", "-h", "--help":
 		printUsage()
 
@@ -128,7 +180,19 @@ func printUsage() {
 	fmt.Println("  phx parse [--json] [--string] <file>  - Parse file and display AST")
 	fmt.Println("  phx run <file>                       - Run PHP script (Stub/Interpreter)")
 	fmt.Println("  phx build -o <output> <main-file>    - Compile and build PHP script to machine binary")
+	fmt.Println("  phx package <subcommand> [args]      - Manage dependencies (alias: pkg)")
 	fmt.Println("  phx help                             - Show this help message")
+}
+
+func printPackageUsage() {
+	fmt.Println("Usage: phx package <subcommand> [args] (alias: pkg)")
+	fmt.Println("Subcommands:")
+	fmt.Println("  init [-y|--yes]                  - Initialize a new phx.json manifest")
+	fmt.Println("  add <package> [constraint]       - Add a dependency and install it")
+	fmt.Println("  install                          - Install dependencies from phx.lock or phx.json")
+	fmt.Println("  update                           - Update dependencies to latest versions")
+	fmt.Println("  publish                          - Publish the package to the local registry")
+	fmt.Println("  search <query>                   - Search for packages in the registry")
 }
 
 func runParse(filePath string, outputJSON bool, outputString bool) {
@@ -185,7 +249,7 @@ func runInterpreter(filePath string) {
 
 	// Compile PHP AST to Go code
 	comp := compiler.New()
-	goCode, err := comp.Compile(program)
+	goCode, err := comp.Compile(program, filePath)
 	if err != nil {
 		fmt.Printf("Compilation Error: %v\n", err)
 		os.Exit(1)
@@ -451,7 +515,7 @@ func runBuild(mainFilePath string, outputBinary string) {
 
 	// Compile to Go
 	comp := compiler.New()
-	goCode, err := comp.Compile(program)
+	goCode, err := comp.Compile(program, absMainPath)
 	if err != nil {
 		fmt.Printf("Compilation Error: %v\n", err)
 		os.Exit(1)

@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHX Package Manager Guide - PHX Developer Guide</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #030712;
+            --sidebar-bg: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.06);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-grad: linear-gradient(135deg, #a78bfa, #f472b6);
+            --code-bg: #090d16;
+            --code-border: rgba(139, 92, 246, 0.15);
+            --highlight: #1e1b4b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            display: flex;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-purple);
+        }
+
+        /* Sidebar navigation */
+        aside {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 30px 20px;
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 35px;
+            padding-left: 10px;
+        }
+
+        .logo-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .logo-sub {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-left: 8px;
+            border: 1px solid var(--accent-purple);
+            padding: 1px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 15px;
+            padding-left: 10px;
+            margin-top: 20px;
+        }
+
+        aside ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        aside a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 10px 14px;
+            border-radius: 8px;
+            display: block;
+            transition: all 0.2s ease-in-out;
+            border-left: 3px solid transparent;
+        }
+
+        aside a:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        aside li.active a, aside a.active {
+            color: #ffffff;
+            background: rgba(139, 92, 246, 0.1);
+            border-left-color: var(--accent-purple);
+        }
+
+        /* Main Content area */
+        main {
+            margin-left: 280px;
+            flex-grow: 1;
+            padding: 50px 80px;
+            max-width: 1100px;
+            position: relative;
+        }
+
+        header {
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin-bottom: 10px;
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-desc {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+        }
+
+        /* Section layout */
+        section {
+            margin-bottom: 60px;
+            scroll-margin-top: 40px;
+        }
+
+        .section-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .section-card:hover {
+            border-color: rgba(139, 92, 246, 0.2);
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 24px;
+            background: var(--accent-grad);
+            border-radius: 2px;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 30px;
+            margin-bottom: 12px;
+            color: #ffffff;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            font-size: 0.975rem;
+        }
+
+        /* Lists */
+        ul.square-list {
+            list-style: none;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        ul.square-list li {
+            position: relative;
+            padding-left: 20px;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        ul.square-list li::before {
+            content: "▪";
+            position: absolute;
+            left: 0;
+            color: var(--accent-purple);
+            font-size: 1.1rem;
+            top: -2px;
+        }
+
+        /* Code Block formatting */
+        pre {
+            background-color: var(--code-bg);
+            border: 1px solid var(--code-border);
+            border-radius: 10px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Inline code */
+        p code, li code {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: var(--accent-pink);
+            font-size: 0.85em;
+        }
+
+        .highlight-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            bottom: 0;
+            background: var(--accent-grad);
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+        }
+
+        .alert-box {
+            background-color: rgba(139, 92, 246, 0.05);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* API Reference Table */
+        .api-table-container {
+            overflow-x: auto;
+            margin-top: 25px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+
+        table.api-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        table.api-table th {
+            background-color: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 18px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        table.api-table td {
+            border-bottom: 1px solid var(--border-color);
+            padding: 14px 18px;
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        table.api-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Responsive layout */
+        @media (max-width: 900px) {
+            body {
+                flex-direction: column;
+            }
+            aside {
+                width: 100%;
+                position: static;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                padding: 20px;
+            }
+            main {
+                margin-left: 0;
+                padding: 40px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="logo-container">
+            <div class="logo-text">PHX</div>
+            <div class="logo-sub">docs</div>
+        </div>
+        <div class="nav-title">Developer Guide</div>
+        <ul>
+            <li><a href="index.html">← Back to Language Reference</a></li>
+            <li><a href="getting_started.html">🚀 Getting Started Tutorial</a></li>
+            <li><a href="web_development.html">🌐 MVC & Web App Tutorial</a></li>
+        </ul>
+        <div class="nav-title">Package Manager</div>
+        <ul>
+            <li class="active"><a href="#intro">1. Introduction</a></li>
+            <li><a href="#init">2. Project Initialization</a></li>
+            <li><a href="#adding">3. Managing Dependencies</a></li>
+            <li><a href="#publishing">4. Package Publishing</a></li>
+            <li><a href="#searching">5. Registry Search</a></li>
+            <li><a href="#autoload">6. Autoloading Mechanics</a></li>
+            <li><a href="#example">7. End-to-End Example</a></li>
+        </ul>
+    </aside>
+
+    <main>
+        <header>
+            <h1>Package Manager Tutorial</h1>
+            <p class="header-desc">Learn how to create, distribute, and consume reusable PHX modules using the built-in package manager CLI.</p>
+        </header>
+
+        <!-- INTRODUCTION -->
+        <section id="intro">
+            <div class="section-card">
+                <h2>1. Introduction to PHX Package Manager</h2>
+                <p>The PHX package manager (accessed via <code>phx package</code> or the shorthand <code>phx pkg</code>) provides native dependency management inspired by modern package ecosystems like Composer (PHP), NPM (Node.js), and Go Modules.</p>
+                <p>It handles automatic dependency resolution (resolving constraint satisfaction and conflict detection), locks package versions for deterministic builds via a lockfile, packages directories securely, and generates an autoloader that works in both interpretation and compiled standalone binary executions.</p>
+
+                <div class="alert-box">
+                    <div class="alert-title">📦 Local Development Registry</div>
+                    <p style="margin-bottom:0;">By default, the package manager resolves packages from a local user directory at <code>~/.phx_registry/</code>, allowing offline development and seamless package publishing without requiring external cloud accounts.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- INITIALIZATION -->
+        <section id="init">
+            <div class="section-card">
+                <h2>2. Initializing a Project</h2>
+                <p>To define dependencies for your project, start by creating a <code>phx.json</code> manifest file. This acts as the configuration blueprint for your application package.</p>
+                
+                <h3>Interactive Setup</h3>
+                <p>Run the package initialization command from your project root:</p>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg init</code></pre>
+                <p>This prompts you for the package name, initial version, description, and main entry file.</p>
+
+                <h3>Non-Interactive (Default) Setup</h3>
+                <p>To automatically skip the interactive questions and create a manifest with standard defaults:</p>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg init -y</code></pre>
+
+                <h3>Manifest Structure (<code>phx.json</code>)</h3>
+                <pre><div class="highlight-bar"></div><code>{
+  "name": "my-application",
+  "version": "1.0.0",
+  "description": "High performance concurrent web service",
+  "main": "index.php",
+  "dependencies": {}
+}</code></pre>
+            </div>
+        </section>
+
+        <!-- ADDING DEPENDENCIES -->
+        <section id="adding">
+            <div class="section-card">
+                <h2>3. Managing Dependencies</h2>
+                <p>Dependencies are packages from the registry required by your project. Adding them updates the manifest and downloads the target archives.</p>
+                
+                <h3>Adding a Dependency</h3>
+                <p>Use the <code>add</code> command to register a package dependency:</p>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg add logger</code></pre>
+                <p>This automatically discovers the latest version, appends a caret constraint (e.g. <code>^1.0.0</code>) to your <code>phx.json</code>, resolves the dependency chain, extracts the package files to <code>phx_packages/</code>, and creates the lockfile.</p>
+
+                <h3>Specifying Version Constraints</h3>
+                <p>You can define exact versions or wildcards for package installation:</p>
+                <div class="api-table-container">
+                    <table class="api-table">
+                        <thead>
+                            <tr>
+                                <th>Constraint</th>
+                                <th>Matches</th>
+                                <th>Example Command</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>^1.0.0</code> (Caret)</td>
+                                <td>Any version within the same major releases (<code>&gt;= 1.0.0, &lt; 2.0.0</code>).</td>
+                                <td><code>phx pkg add logger ^1.0.0</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>1.0.0</code> (Exact)</td>
+                                <td>Precisely version 1.0.0.</td>
+                                <td><code>phx pkg add logger 1.0.0</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>*</code> or <code>latest</code></td>
+                                <td>The absolute highest version published.</td>
+                                <td><code>phx pkg add logger *</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Installing Dependencies (Deterministic Builds)</h3>
+                <p>When deploying code or starting on a clean project clone, retrieve all requirements listed in <code>phx.lock</code> or <code>phx.json</code> by running:</p>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg install</code></pre>
+                <p>This creates a consistent local folder layout in <code>phx_packages/</code>.</p>
+
+                <h3>Updating Dependencies</h3>
+                <p>To upgrade packages to the latest matching constraints and regenerate your lockfile, run:</p>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg update</code></pre>
+            </div>
+        </section>
+
+        <!-- PUBLISHING -->
+        <section id="publishing">
+            <div class="section-card">
+                <h2>4. Package Publishing</h2>
+                <p>You can package your own custom modules and make them available to other projects on your machine. The publisher automatically zips files in your directory while excluding dependency caches like <code>phx_packages/</code>, <code>.git/</code>, or <code>node_modules/</code>.</p>
+
+                <h3>Steps to Publish a Package</h3>
+                <ul class="square-list">
+                    <li>Create your package folder (e.g. <code>packages_source/my-package</code>).</li>
+                    <li>Initialize a <code>phx.json</code> manifest detailing your package's metadata and dependencies.</li>
+                    <li>Add your class files (e.g. <code>src/Utility.php</code>) and specify the main entry file in the <code>"main"</code> field of your manifest.</li>
+                    <li>Run the publish command from within the package directory:</li>
+                </ul>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg publish</code></pre>
+
+                <p>This zips the source directory and saves it to <code>~/.phx_registry/my-package/my-package-&lt;version&gt;.zip</code> while registering the version details in the registry index.</p>
+            </div>
+        </section>
+
+        <!-- SEARCHING -->
+        <section id="searching">
+            <div class="section-card">
+                <h2>5. Registry Search</h2>
+                <p>Use the search utility to discover published packages available in the local registry.</p>
+
+                <h3>List All Packages</h3>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg search</code></pre>
+
+                <h3>Filter Packages by Name</h3>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg search math</code></pre>
+            </div>
+        </section>
+
+        <!-- AUTOLOADING -->
+        <section id="autoload">
+            <div class="section-card">
+                <h2>6. Autoloading Mechanics</h2>
+                <p>When the package manager installs dependencies, it generates a single PHP routing file at <code>phx_packages/autoload.php</code>. This handles registering and importing every required class entry-point dynamically.</p>
+
+                <h3>Using Autoloading in Your Code</h3>
+                <p>At the start of your main program, simply include this file. You do not need to write multiple static include calls for each individual file anymore!</p>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+// Include all packages instantly
+include "phx_packages/autoload.php";
+
+$log = new Logger();
+$log->info("Autoloader successfully initialized.");
+?&gt;</code></pre>
+
+                <h3>How it Works Under the Hood</h3>
+                <p>PHX parses the <code>include "phx_packages/autoload.php";</code> statement. During compilation (<code>phx build</code>), the static parser resolves these inclusions and incorporates the code definitions directly into the generated Go executable structure, resulting in a single native binary containing all package logic.</p>
+            </div>
+        </section>
+
+        <!-- END TO END EXAMPLE -->
+        <section id="example">
+            <div class="section-card">
+                <h2>7. End-to-End Example</h2>
+                <p>Let's create a complete workflow demonstrating the package manager. We will initialize a project, install the built-in <code>logger</code> and <code>math-helper</code> packages, and run a script using both classes.</p>
+
+                <h3>Step 1: Setup Workspace & Initialize</h3>
+                <pre><div class="highlight-bar"></div><code>$ mkdir test_project
+$ cd test_project
+$ phx pkg init -y</code></pre>
+
+                <h3>Step 2: Add Dependencies</h3>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg add logger
+$ phx pkg add math-helper</code></pre>
+
+                <h3>Step 3: Write code (<code>main.php</code>)</h3>
+                <pre><div class="highlight-bar"></div><code>&lt;?php
+include "phx_packages/autoload.php";
+
+$logger = new Logger();
+$math = new MathHelper();
+
+$logger->info("Starting calculation...");
+$result = $math->factorial(5);
+$logger->success("Factorial of 5 is: " . $result);
+?&gt;</code></pre>
+
+                <h3>Step 4: Execute via Interpreter</h3>
+                <pre><div class="highlight-bar"></div><code>$ phx run main.php
+[INFO] Starting calculation...
+[SUCCESS] Factorial of 5 is: 120</code></pre>
+
+                <h3>Step 5: Compile Standalone Machine Binary</h3>
+                <pre><div class="highlight-bar"></div><code>$ phx build -o my_math_app main.php
+$ ./my_math_app
+[INFO] Starting calculation...
+[SUCCESS] Factorial of 5 is: 120</code></pre>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Scrollspy to highlight active sidebar nav item
+        const links = document.querySelectorAll('aside a');
+        const sections = document.querySelectorAll('section');
+
+        function changeLinkState() {
+            let index = sections.length;
+
+            while(--index && window.scrollY + 100 < sections[index].offsetTop) {}
+            
+            links.forEach((link) => link.classList.remove('active'));
+            if (index >= 0) {
+                const navLinks = Array.from(links).filter(link => link.getAttribute('href').startsWith('#'));
+                navLinks.forEach((link) => link.classList.remove('active'));
+                
+                const currentId = '#' + sections[index].id;
+                const activeLink = Array.from(links).find(link => link.getAttribute('href') === currentId);
+                if (activeLink) {
+                    activeLink.classList.add('active');
+                }
+            }
+        }
+
+        changeLinkState();
+        window.addEventListener('scroll', changeLinkState);
+    </script>
+</body>
+</html>
