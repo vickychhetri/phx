@@ -140,6 +140,28 @@ go test -v ./...
 
 ---
 
+## Package Management (alias: pkg)
+
+PHX uses Go modules for dependency management. Use the `pkg` command to manage your project's dependencies:
+
+```bash
+bin/phx pkg init <project-name>
+
+bin/phx pkg add <github-username>/<repo-name>
+
+bin/phx pkg update
+
+```
+
+### Example
+
+```bash
+# Create a new project
+bin/phx pkg init my-web-service
+
+```
+
+---
 ## License
 
 PHX is released under the **MIT License**. See the `LICENSE` file for details.
