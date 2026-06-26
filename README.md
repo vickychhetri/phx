@@ -1,4 +1,4 @@
-# PHX – A Native Go‑based PHP Compiler & Runtime
+# PHX – A Native PHP Compiler & Runtime
 
 **PHX** is a high-performance transpilation engine, compiler, and runtime for a PHP‑compatible programming language, written from the ground up in Go. Rather than relying on traditional slow tree-walking or virtual machine interpretation, PHX parses PHP source files, translates the Abstract Syntax Tree (AST) directly into highly optimized Go code, and compiles it via the native Go toolchain (`go build`) to produce self-contained, high-performance machine executables.
 
