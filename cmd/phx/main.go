@@ -280,6 +280,7 @@ func runInterpreter(filePath string) {
 	}
 
 	tempGoFile := filepath.Join(tempDir, "main.go")
+	_ = ioutil.WriteFile("scratch_main.go", []byte(goCode), 0644)
 	err = ioutil.WriteFile(tempGoFile, []byte(goCode), 0644)
 	if err != nil {
 		fmt.Printf("Error writing temporary Go file: %v\n", err)
@@ -295,6 +296,7 @@ func runInterpreter(filePath string) {
 	err = buildCmd.Run()
 	if err != nil {
 		fmt.Printf("Error compiling binary: %v\n", err)
+		_ = ioutil.WriteFile("scratch_main.go", []byte(goCode), 0644)
 		os.RemoveAll(tempDir)
 		os.Exit(1)
 	}

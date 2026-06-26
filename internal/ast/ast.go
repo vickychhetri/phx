@@ -251,13 +251,22 @@ type Parameter struct {
 	Token        token.Token // variable token
 	Var          *Variable
 	DefaultValue Expression // nil if no default
+	Type         string     // Optional parameter type hint
+	Nullable     bool       // Optional nullable flag
 }
 
 func (p *Parameter) String() string {
-	if p.DefaultValue != nil {
-		return p.Var.String() + " = " + p.DefaultValue.String()
+	var prefix string
+	if p.Nullable {
+		prefix = "?"
 	}
-	return p.Var.String()
+	if p.Type != "" {
+		prefix += p.Type + " "
+	}
+	if p.DefaultValue != nil {
+		return prefix + p.Var.String() + " = " + p.DefaultValue.String()
+	}
+	return prefix + p.Var.String()
 }
 
 // FunctionStatement represents function definition
@@ -305,11 +314,17 @@ func (fe *FunctionExpression) String() string {
 	return out.String()
 }
 
+type ClassConstant struct {
+	Name  string
+	Value Expression
+}
+
 // ClassStatement represents class definition
 type ClassStatement struct {
-	Token   token.Token // 'class'
-	Name    *Identifier
-	Methods []*FunctionStatement
+	Token     token.Token // 'class'
+	Name      *Identifier
+	Methods   []*FunctionStatement
+	Constants []*ClassConstant
 }
 
 func (cs *ClassStatement) statementNode()       {}
@@ -490,6 +505,27 @@ func (dws *DoWhileStatement) statementNode()       {}
 func (dws *DoWhileStatement) TokenLiteral() string { return dws.Token.Literal }
 func (dws *DoWhileStatement) String() string {
 	return "do " + dws.Body.String() + " while (" + dws.Condition.String() + ");"
+}
+
+// ForeachStatement represents 'foreach ($arr as [$key =>] $val) { body }'
+type ForeachStatement struct {
+	Token      token.Token // 'foreach'
+	Expression Expression
+	Key        *Variable
+	Value      *Variable
+	Body       *BlockStatement
+}
+
+func (fs *ForeachStatement) statementNode()       {}
+func (fs *ForeachStatement) TokenLiteral() string { return fs.Token.Literal }
+func (fs *ForeachStatement) String() string {
+	var out string
+	out += "foreach (" + fs.Expression.String() + " as "
+	if fs.Key != nil {
+		out += fs.Key.String() + " => "
+	}
+	out += fs.Value.String() + ") " + fs.Body.String()
+	return out
 }
 
 // ForStatement represents 'for (init; cond; post) { body }'

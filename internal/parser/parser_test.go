@@ -137,6 +137,72 @@ if ($x === true) {
 	}
 }
 
+func TestNewOperatorsAndForeach(t *testing.T) {
+	input := `<?php
+$a = $b ?? $c;
+$x = $y && $z || $w;
+$m = $n | $o & $p;
+@mkdir($dir);
+foreach ($items as $key => $val) {
+	echo $key, $val;
+}
+foreach ($items as $val) {
+	echo $val;
+}
+`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 6 {
+		t.Fatalf("program.Statements does not contain 6 statements. got=%d", len(program.Statements))
+	}
+
+	// 1. Coalesce
+	stmt1, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt1 is not ExpressionStatement. got=%T", program.Statements[0])
+	}
+	assign, ok := stmt1.Expression.(*ast.AssignExpression)
+	if !ok {
+		t.Fatalf("stmt1.Expression is not AssignExpression, got=%T", stmt1.Expression)
+	}
+	coalesce, ok := assign.Value.(*ast.InfixExpression)
+	if !ok || coalesce.Operator != "??" {
+		t.Fatalf("assign.Value is not InfixExpression ??, got=%v", assign.Value)
+	}
+
+	// 4. Prefix @
+	stmt4, ok := program.Statements[3].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt4 is not ExpressionStatement. got=%T", program.Statements[3])
+	}
+	atExpr, ok := stmt4.Expression.(*ast.PrefixExpression)
+	if !ok || atExpr.Operator != "@" {
+		t.Fatalf("stmt4.Expression is not PrefixExpression @, got=%v", stmt4.Expression)
+	}
+
+	// 5. Foreach with key and value
+	foreach1, ok := program.Statements[4].(*ast.ForeachStatement)
+	if !ok {
+		t.Fatalf("stmt5 is not ForeachStatement, got=%T", program.Statements[4])
+	}
+	if foreach1.Key == nil || foreach1.Key.Value != "$key" || foreach1.Value.Value != "$val" {
+		t.Errorf("foreach1 Key/Value mismatch, got key=%v, val=%v", foreach1.Key, foreach1.Value)
+	}
+
+	// 6. Foreach with value only
+	foreach2, ok := program.Statements[5].(*ast.ForeachStatement)
+	if !ok {
+		t.Fatalf("stmt6 is not ForeachStatement, got=%T", program.Statements[5])
+	}
+	if foreach2.Key != nil || foreach2.Value.Value != "$val" {
+		t.Errorf("foreach2 Key/Value mismatch, got key=%v, val=%v", foreach2.Key, foreach2.Value)
+	}
+}
+
 func checkParserErrors(t *testing.T, p *Parser) {
 	errors := p.Errors()
 	if len(errors) == 0 {

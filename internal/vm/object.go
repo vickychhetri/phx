@@ -128,8 +128,9 @@ func (rv *ReturnValue) Type() ObjectType { return RETURN_VALUE_OBJ }
 func (rv *ReturnValue) Inspect() string  { return rv.Value.Inspect() }
 
 type Class struct {
-	Name    string
-	Methods map[string]*Function
+	Name      string
+	Methods   map[string]*Function
+	Constants map[string]Object
 }
 
 func (c *Class) Type() ObjectType { return CLASS_OBJ }

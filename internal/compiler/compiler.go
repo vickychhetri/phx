@@ -18,6 +18,9 @@ type Compiler struct {
 	inTryCatch   bool
 	inFunction   bool
 	dirStack     []string
+	errors       []string
+	tempCounter  int
+	currentClass string
 }
 
 func New() *Compiler {
@@ -26,7 +29,15 @@ func New() *Compiler {
 		inTryCatch:   false,
 		inFunction:   false,
 		dirStack:     make([]string, 0),
+		errors:       nil,
+		tempCounter:  0,
+		currentClass: "",
 	}
+}
+
+func (c *Compiler) newTempVar() string {
+	c.tempCounter++
+	return fmt.Sprintf("_tmp_%d", c.tempCounter)
 }
 
 func (c *Compiler) hasTryCatch(node ast.Node) bool {
@@ -54,8 +65,12 @@ func (c *Compiler) hasTryCatch(node ast.Node) bool {
 		return c.hasTryCatch(n.Init) || c.hasTryCatch(n.Condition) || c.hasTryCatch(n.Post) || c.hasTryCatch(n.Body)
 	case *ast.WhileStatement:
 		return c.hasTryCatch(n.Condition) || c.hasTryCatch(n.Body)
+	case *ast.ForeachStatement:
+		return c.hasTryCatch(n.Expression) || c.hasTryCatch(n.Body)
 	case *ast.DoWhileStatement:
 		return c.hasTryCatch(n.Condition) || c.hasTryCatch(n.Body)
+	case *ast.NamespaceStatement, *ast.UseStatement:
+		return false
 	case *ast.TryCatchStatement:
 		return true
 	case *ast.IncludeStatement:
@@ -98,6 +113,7 @@ func (c *Compiler) hasTryCatch(node ast.Node) bool {
 
 func (c *Compiler) Compile(program *ast.Program, mainFilePath string) (string, error) {
 	c.dirStack = []string{filepath.Dir(mainFilePath)}
+	c.errors = nil
 
 	var buf bytes.Buffer
 	buf.WriteString(goHeader)
@@ -151,6 +167,10 @@ func (c *Compiler) Compile(program *ast.Program, mainFilePath string) (string, e
 		buf.WriteString("\t" + c.compileNode(stmt) + "\n")
 	}
 	buf.WriteString("}\n")
+
+	if len(c.errors) > 0 {
+		return "", fmt.Errorf("compilation errors:\n%s", strings.Join(c.errors, "\n"))
+	}
 
 	return buf.String(), nil
 }
@@ -235,6 +255,28 @@ func (c *Compiler) compileNode(node ast.Node) string {
 		cond := IsTruthyCode(c.compileNode(n.Condition))
 		return fmt.Sprintf("for {\n\t%s\n\tif !(%s) {\n\t\tbreak\n\t}\n}", body, cond)
 
+	case *ast.ForeachStatement:
+		arrCode := c.compileNode(n.Expression)
+		valVar := c.getVarName(n.Value.Value)
+		var bodyBuf bytes.Buffer
+		for _, stmt := range n.Body.Statements {
+			bodyBuf.WriteString(c.compileNode(stmt) + "\n")
+		}
+		bodyCode := bodyBuf.String()
+
+		tempArr := c.newTempVar()
+		tempIdx := c.newTempVar()
+
+		var loopHeader string
+		if n.Key != nil {
+			keyVar := c.getVarName(n.Key.Value)
+			loopHeader = fmt.Sprintf("{\n\t%s := %s\n\tfor %s := 0; %s < len(%s.Array); %s += 2 {\n\t\t%s = %s.Array[%s]\n\t\t%s = %s.Array[%s+1]\n", tempArr, arrCode, tempIdx, tempIdx, tempArr, tempIdx, keyVar, tempArr, tempIdx, valVar, tempArr, tempIdx)
+		} else {
+			loopHeader = fmt.Sprintf("{\n\t%s := %s\n\tfor %s := 0; %s < len(%s.Array); %s += 2 {\n\t\t%s = %s.Array[%s+1]\n", tempArr, arrCode, tempIdx, tempIdx, tempArr, tempIdx, valVar, tempArr, tempIdx)
+		}
+
+		return fmt.Sprintf("%s\t\t%s\t}\n}", loopHeader, bodyCode)
+
 	case *ast.ForStatement:
 		initCode := ""
 		if n.Init != nil {
@@ -256,6 +298,12 @@ func (c *Compiler) compileNode(node ast.Node) string {
 
 	case *ast.ContinueStatement:
 		return "continue"
+
+	case *ast.NamespaceStatement:
+		return ""
+
+	case *ast.UseStatement:
+		return ""
 
 	case *ast.ReturnStatement:
 		valCode := "Val{}"
@@ -299,10 +347,10 @@ func (c *Compiler) compileNode(node ast.Node) string {
 				return fmt.Sprintf("SetProperty(%s, %q, %s)", objCode, propName, valCode)
 			}
 			return fmt.Sprintf("%s = %s", leftCode, valCode)
-		case "+=", "-=", "*=":
+		case "+=", "-=", "*=", ".=":
 			leftStr, leftOk := c.isIntExpr(n.Left)
 			valStr, valOk := c.isIntExpr(n.Value)
-			if leftOk && valOk {
+			if leftOk && valOk && op != ".=" {
 				return fmt.Sprintf("%s %s %s", leftStr, op, valStr)
 			}
 			if pe, ok := n.Left.(*ast.PropertyExpression); ok {
@@ -314,8 +362,10 @@ func (c *Compiler) compileNode(node ast.Node) string {
 				return fmt.Sprintf("AddAssign(&%s, %s)", leftCode, valCode)
 			} else if op == "-=" {
 				return fmt.Sprintf("SubAssign(&%s, %s)", leftCode, valCode)
-			} else {
+			} else if op == "*=" {
 				return fmt.Sprintf("MulAssign(&%s, %s)", leftCode, valCode)
+			} else {
+				return fmt.Sprintf("ConcatAssign(&%s, %s)", leftCode, valCode)
 			}
 		default:
 			return fmt.Sprintf("%s = %s", leftCode, valCode)
@@ -376,6 +426,22 @@ func (c *Compiler) compileNode(node ast.Node) string {
 		case "==", "===": return fmt.Sprintf("Eq(%s, %s)", left, right)
 		case "!=", "!==": return fmt.Sprintf("Ne(%s, %s)", left, right)
 		case ".": return fmt.Sprintf("Concat(%s, %s)", left, right)
+		case "&&", "and": return fmt.Sprintf("And(%s, %s)", left, right)
+		case "||", "or": return fmt.Sprintf("Or(%s, %s)", left, right)
+		case "&": return fmt.Sprintf("BitwiseAnd(%s, %s)", left, right)
+		case "|": return fmt.Sprintf("BitwiseOr(%s, %s)", left, right)
+		case "??": return fmt.Sprintf("Coalesce(%s, %s)", left, right)
+		case "::":
+			leftIdent, leftOk := n.Left.(*ast.Identifier)
+			rightIdent, rightOk := n.Right.(*ast.Identifier)
+			if leftOk && rightOk {
+				className := leftIdent.Value
+				if className == "self" {
+					className = c.currentClass
+				}
+				return fmt.Sprintf("classes[%q][%q]", className, rightIdent.Value)
+			}
+			return fmt.Sprintf("classes[%s][%s]", left, right)
 		default:
 			return fmt.Sprintf("Add(%s, %s)", left, right)
 		}
@@ -404,6 +470,7 @@ func (c *Compiler) compileNode(node ast.Node) string {
 		case "--": return fmt.Sprintf("PrefixDec(&%s)", right)
 		case "!": return fmt.Sprintf("Not(%s)", right)
 		case "-": return fmt.Sprintf("Neg(%s)", right)
+		case "@": return right
 		default:
 			return right
 		}
@@ -564,8 +631,15 @@ func (c *Compiler) compileNode(node ast.Node) string {
 		return buf.String()
 
 	case *ast.ClassStatement:
+		oldClass := c.currentClass
+		c.currentClass = n.Name.Value
+
 		var buf bytes.Buffer
 		buf.WriteString(fmt.Sprintf("classes[%q] = map[string]Val{\n", n.Name.Value))
+		for _, cst := range n.Constants {
+			constValCode := c.compileNode(cst.Value)
+			buf.WriteString(fmt.Sprintf("\t%q: %s,\n", cst.Name, constValCode))
+		}
 		for _, m := range n.Methods {
 			methodName := m.Name.Value
 			buf.WriteString(fmt.Sprintf("\t%q: Val{Type: 8, Func: func(args ...Val) Val {\n", methodName))
@@ -620,6 +694,7 @@ func (c *Compiler) compileNode(node ast.Node) string {
 			buf.WriteString("\t}},\n")
 		}
 		buf.WriteString("}")
+		c.currentClass = oldClass
 		return buf.String()
 
 	case *ast.NewExpression:
@@ -809,6 +884,9 @@ func (c *Compiler) compileNode(node ast.Node) string {
 		p := parser.New(l)
 		prog := p.ParseProgram()
 		if len(p.Errors()) > 0 {
+			for _, errStr := range p.Errors() {
+				c.errors = append(c.errors, fmt.Sprintf("  - %s: %s", resolvedPath, errStr))
+			}
 			return fmt.Sprintf("panic(\"parser errors in include file: %s\")", filename)
 		}
 		c.dirStack = append(c.dirStack, filepath.Dir(resolvedPath))
@@ -854,9 +932,20 @@ func (c *Compiler) collectVarsInBody(node ast.Node, localVars map[string]bool) {
 	case *ast.WhileStatement:
 		c.collectVarsInBody(n.Condition, localVars)
 		c.collectVarsInBody(n.Body, localVars)
+	case *ast.ForeachStatement:
+		if n.Key != nil {
+			localVars[strings.TrimPrefix(n.Key.Value, "$")] = true
+		}
+		if n.Value != nil {
+			localVars[strings.TrimPrefix(n.Value.Value, "$")] = true
+		}
+		c.collectVarsInBody(n.Expression, localVars)
+		c.collectVarsInBody(n.Body, localVars)
 	case *ast.DoWhileStatement:
 		c.collectVarsInBody(n.Condition, localVars)
 		c.collectVarsInBody(n.Body, localVars)
+	case *ast.NamespaceStatement, *ast.UseStatement:
+		// no-op
 	case *ast.IfStatement:
 		c.collectVarsInBody(n.Condition, localVars)
 		c.collectVarsInBody(n.Consequence, localVars)
@@ -925,8 +1014,19 @@ func (c *Compiler) compileStringLiteral(s string) string {
 				end++
 			}
 			if end < n {
-				varName := s[start+1 : end]
-				parts = append(parts, fmt.Sprintf("ToString(%s)", c.getVarName(varName)))
+				exprStr := s[start:end]
+				exprLexer := lexer.New("<?php " + exprStr + ";")
+				exprParser := parser.New(exprLexer)
+				program := exprParser.ParseProgram()
+				if len(program.Statements) == 1 {
+					if exprStmt, ok := program.Statements[0].(*ast.ExpressionStatement); ok {
+						compiledExpr := c.compileNode(exprStmt.Expression)
+						parts = append(parts, fmt.Sprintf("ToString(%s)", compiledExpr))
+						i = end + 1
+						continue
+					}
+				}
+				parts = append(parts, fmt.Sprintf("NewStr(%q)", exprStr))
 				i = end + 1
 				continue
 			}
@@ -1004,7 +1104,10 @@ func isBuiltin(name string) bool {
 	case "count", "microtime", "channel", "send", "receive", "spawn", "intdiv",
 		"sleep", "print_r", "strtoupper", "strtolower", "str_repeat", "trim",
 		"str_replace", "number_format", "strlen", "strpos", "substr", "readline",
-		"intval", "floatval", "strval", "abs", "min", "max", "rand":
+		"intval", "floatval", "strval", "abs", "min", "max", "rand", "is_dir",
+		"mkdir", "array_merge", "isset", "unset", "get_class", "empty", "json_encode",
+		"dirname", "file_exists", "filesize", "file_put_contents", "glob", "unlink",
+		"basename", "rename", "date", "file_get_contents":
 		return true
 	}
 	return false
@@ -1025,6 +1128,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"sync"
+	"path/filepath"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 )
@@ -1661,6 +1765,7 @@ func AssignPropertyOp(obj Val, prop string, op string, val Val) Val {
 	case "+=": res = Add(old, val)
 	case "-=": res = Sub(old, val)
 	case "*=": res = Mul(old, val)
+	case ".=": res = Concat(old, val)
 	}
 	SetProperty(obj, prop, res)
 	return res
@@ -1681,6 +1786,44 @@ func NewArray(elems ...Val) Val {
 
 func NewAssociativeArray(elems ...Val) Val {
 	return Val{Type: 5, Array: elems}
+}
+
+func And(a, b Val) Val {
+	return NewBool(IsTruthy(a) && IsTruthy(b))
+}
+
+func Or(a, b Val) Val {
+	return NewBool(IsTruthy(a) || IsTruthy(b))
+}
+
+func toIntVal(v Val) int64 {
+	switch v.Type {
+	case 1: return v.Int
+	case 2: return int64(v.Float)
+	case 3:
+		if v.Bool { return 1 }
+		return 0
+	case 4:
+		var i int64
+		fmt.Sscanf(v.Str, "%d", &i)
+		return i
+	default: return 0
+	}
+}
+
+func BitwiseAnd(a, b Val) Val {
+	return NewInt(toIntVal(a) & toIntVal(b))
+}
+
+func BitwiseOr(a, b Val) Val {
+	return NewInt(toIntVal(a) | toIntVal(b))
+}
+
+func Coalesce(a, b Val) Val {
+	if a.Type != 0 {
+		return a
+	}
+	return b
 }
 
 func Add(a, b Val) Val {
@@ -1833,6 +1976,11 @@ func SubAssign(a *Val, b Val) Val {
 
 func MulAssign(a *Val, b Val) Val {
 	*a = Mul(*a, b)
+	return *a
+}
+
+func ConcatAssign(a *Val, b Val) Val {
+	*a = Concat(*a, b)
 	return *a
 }
 
@@ -2051,6 +2199,229 @@ var sleep = Val{Type: 8, Func: func(args ...Val) Val {
 	d := toF(args[0])
 	time.Sleep(time.Duration(d * float64(time.Second)))
 	return Val{}
+}}
+
+var JSON_PRETTY_PRINT = NewInt(128)
+var JSON_UNESCAPED_SLASHES = NewInt(64)
+var DIRECTORY_SEPARATOR = NewStr("/")
+var FILE_APPEND = NewInt(8)
+var LOCK_EX = NewInt(2)
+
+var date = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewStr("") }
+	format := args[0].Str
+	t := time.Now()
+	goFormat := format
+	goFormat = strings.ReplaceAll(goFormat, "Y", "2006")
+	goFormat = strings.ReplaceAll(goFormat, "m", "01")
+	goFormat = strings.ReplaceAll(goFormat, "d", "02")
+	goFormat = strings.ReplaceAll(goFormat, "H", "15")
+	goFormat = strings.ReplaceAll(goFormat, "i", "04")
+	goFormat = strings.ReplaceAll(goFormat, "s", "05")
+	goFormat = strings.ReplaceAll(goFormat, "u", fmt.Sprintf("%06d", t.Nanosecond()/1000))
+	return NewStr(t.Format(goFormat))
+}}
+
+var is_dir = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewBool(false) }
+	path := args[0].Str
+	info, err := os.Stat(path)
+	if err != nil { return NewBool(false) }
+	return NewBool(info.IsDir())
+}}
+
+var mkdir = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewBool(false) }
+	path := args[0].Str
+	perm := os.FileMode(0755)
+	if len(args) > 1 {
+		perm = os.FileMode(args[1].Int)
+	}
+	recursive := false
+	if len(args) > 2 {
+		recursive = args[2].Bool
+	}
+	var err error
+	if recursive {
+		err = os.MkdirAll(path, perm)
+	} else {
+		err = os.Mkdir(path, perm)
+	}
+	return NewBool(err == nil)
+}}
+
+var array_merge = Val{Type: 8, Func: func(args ...Val) Val {
+	var merged []Val
+	for _, arg := range args {
+		if arg.Type == 5 {
+			merged = append(merged, arg.Array...)
+		}
+	}
+	return Val{Type: 5, Array: merged}
+}}
+
+var isset = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewBool(false) }
+	for _, arg := range args {
+		if arg.Type == 0 { return NewBool(false) }
+	}
+	return NewBool(true)
+}}
+
+var unset = Val{Type: 8, Func: func(args ...Val) Val {
+	return Val{}
+}}
+
+var get_class = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewStr("") }
+	obj := args[0]
+	if obj.Type == 9 && obj.Obj != nil {
+		if po, ok := obj.Obj.(*PHXObject); ok {
+			return NewStr(po.ClassName)
+		}
+	}
+	return NewStr("")
+}}
+
+var empty = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewBool(true) }
+	arg := args[0]
+	switch arg.Type {
+	case 0: return NewBool(true)
+	case 1: return NewBool(arg.Int == 0)
+	case 2: return NewBool(arg.Float == 0)
+	case 3: return NewBool(!arg.Bool)
+	case 4: return NewBool(arg.Str == "" || arg.Str == "0")
+	case 5: return NewBool(len(arg.Array) == 0)
+	}
+	return NewBool(false)
+}}
+
+var json_encode = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewStr("") }
+	val := args[0]
+	var convert func(v Val) interface{}
+	convert = func(v Val) interface{} {
+		switch v.Type {
+		case 0: return nil
+		case 1: return v.Int
+		case 2: return v.Float
+		case 3: return v.Bool
+		case 4: return v.Str
+		case 5:
+			isAssoc := false
+			for i := 0; i < len(v.Array); i += 2 {
+				k := v.Array[i]
+				if k.Type == 4 {
+					isAssoc = true
+					break
+				}
+			}
+			if isAssoc {
+				m := make(map[string]interface{})
+				for i := 0; i < len(v.Array); i += 2 {
+					k := v.Array[i]
+					m[ToString(k).Str] = convert(v.Array[i+1])
+				}
+				return m
+			} else {
+				var s []interface{}
+				for i := 0; i < len(v.Array); i += 2 {
+					s = append(s, convert(v.Array[i+1]))
+				}
+				return s
+			}
+		}
+		return nil
+	}
+	var data []byte
+	var err error
+	pretty := false
+	if len(args) > 1 {
+		pretty = (args[1].Int & 128) != 0
+	}
+	if pretty {
+		data, err = json.MarshalIndent(convert(val), "", "    ")
+	} else {
+		data, err = json.Marshal(convert(val))
+	}
+	if err != nil { return NewStr("") }
+	return NewStr(string(data))
+}}
+
+var dirname = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewStr("") }
+	return NewStr(filepath.Dir(args[0].Str))
+}}
+
+var file_exists = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewBool(false) }
+	_, err := os.Stat(args[0].Str)
+	return NewBool(err == nil)
+}}
+
+var filesize = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewInt(0) }
+	info, err := os.Stat(args[0].Str)
+	if err != nil { return NewInt(0) }
+	return NewInt(info.Size())
+}}
+
+var file_put_contents = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) < 2 { return NewInt(0) }
+	path := args[0].Str
+	data := args[1].Str
+	flags := int64(0)
+	if len(args) > 2 {
+		flags = args[2].Int
+	}
+	var fileFlags int
+	if (flags & 8) != 0 {
+		fileFlags = os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	} else {
+		fileFlags = os.O_TRUNC | os.O_CREATE | os.O_WRONLY
+	}
+	f, err := os.OpenFile(path, fileFlags, 0644)
+	if err != nil { return NewInt(0) }
+	defer f.Close()
+	n, err := f.WriteString(data)
+	if err != nil { return NewInt(0) }
+	return NewInt(int64(n))
+}}
+
+var glob = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewArray() }
+	matches, err := filepath.Glob(args[0].Str)
+	if err != nil { return NewArray() }
+	var vals []Val
+	for _, m := range matches {
+		vals = append(vals, NewStr(m))
+	}
+	return NewArray(vals...)
+}}
+
+var unlink = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewBool(false) }
+	err := os.Remove(args[0].Str)
+	return NewBool(err == nil)
+}}
+
+var basename = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewStr("") }
+	return NewStr(filepath.Base(args[0].Str))
+}}
+
+var rename = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) < 2 { return NewBool(false) }
+	err := os.Rename(args[0].Str, args[1].Str)
+	return NewBool(err == nil)
+}}
+
+var file_get_contents = Val{Type: 8, Func: func(args ...Val) Val {
+	if len(args) == 0 { return NewStr("") }
+	data, err := os.ReadFile(args[0].Str)
+	if err != nil { return NewStr("") }
+	return NewStr(string(data))
 }}
 
 func formatPrintR(v Val, indent string) string {

@@ -47,9 +47,16 @@ const (
 	GTE           = ">="
 
 	BANG = "!"
+	AND         = "&&"
+	OR          = "||"
+	BITWISE_AND = "&"
+	BITWISE_OR  = "|"
+	COALESCE    = "??"
+	AT          = "@"
 
 	ADD_ASSIGN = "+="
 	SUB_ASSIGN = "-="
+	CONCAT_ASSIGN = ".="
 
 	INC = "++"
 	DEC = "--"
@@ -58,6 +65,7 @@ const (
 	DOUBLE_ARROW    = "=>"
 	QUESTION        = "?"
 	COLON           = ":"
+	DOUBLE_COLON    = "::"
 
 	// Delimiters
 	SEMICOLON = ";"
@@ -92,6 +100,7 @@ const (
 	PUBLIC    = "public"
 	PROTECTED = "protected"
 	PRIVATE   = "private"
+	CONST     = "const"
 
 	WHILE    = "while"
 	DO       = "do"
@@ -130,6 +139,7 @@ var keywords = map[string]TokenType{
 	"public":       PUBLIC,
 	"protected":    PROTECTED,
 	"private":      PRIVATE,
+	"const":        CONST,
 	"while":        WHILE,
 	"do":           DO,
 	"for":          FOR,

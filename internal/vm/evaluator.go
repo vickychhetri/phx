@@ -189,6 +189,37 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 		}
 		return NULL
 
+	case *ast.ForeachStatement:
+		arrObj := Evaluate(n.Expression, env, out)
+		if isError(arrObj) {
+			return arrObj
+		}
+		arr, ok := arrObj.(*Array)
+		if !ok {
+			return newError("foreach expression is not an array: %s", arrObj.Type())
+		}
+
+		foreachLoop: for _, pair := range arr.Pairs {
+			loopEnv := NewEnclosedEnvironment(env)
+			if n.Key != nil {
+				loopEnv.Set(n.Key.Value, pair.Key)
+			}
+			loopEnv.Set(n.Value.Value, pair.Value)
+
+			result := Evaluate(n.Body, loopEnv, out)
+			if result != nil {
+				switch result.(type) {
+				case *Error, *ReturnValue, *ExceptionObject:
+					return result
+				case *Break:
+					break foreachLoop
+				case *Continue:
+					continue foreachLoop
+				}
+			}
+		}
+		return NULL
+
 	case *ast.ForStatement:
 		if n.Init != nil {
 			initVal := Evaluate(n.Init, env, out)
@@ -255,7 +286,7 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 			return val
 		}
 
-		if n.Token.Type == token.ADD_ASSIGN || n.Token.Type == token.SUB_ASSIGN {
+		if n.Token.Type == token.ADD_ASSIGN || n.Token.Type == token.SUB_ASSIGN || n.Token.Type == token.CONCAT_ASSIGN {
 			currVal := getTargetValue(n.Left, env, out)
 			if isError(currVal) {
 				return currVal
@@ -263,6 +294,8 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 			op := "+"
 			if n.Token.Type == token.SUB_ASSIGN {
 				op = "-"
+			} else if n.Token.Type == token.CONCAT_ASSIGN {
+				op = "."
 			}
 			val = evalInfixExpression(op, currVal, val)
 			if isError(val) {
@@ -329,6 +362,45 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 		return currVal
 
 	case *ast.InfixExpression:
+		if n.Operator == "::" {
+			var classObj Object
+			leftIdent, leftOk := n.Left.(*ast.Identifier)
+			if leftOk && leftIdent.Value == "self" {
+				thisObj, ok := env.Get("$this")
+				if ok {
+					if inst, ok := thisObj.(*ObjectInstance); ok {
+						classObj = inst.Class
+					}
+				}
+			}
+			if classObj == nil {
+				leftName := ""
+				if leftOk {
+					leftName = leftIdent.Value
+				} else if leftVar, ok := n.Left.(*ast.Variable); ok {
+					leftName = leftVar.Value
+				}
+				if leftName != "" {
+					resolvedClass := env.ResolveName(leftName)
+					if cObj, ok := env.Get(resolvedClass); ok {
+						classObj = cObj
+					}
+				}
+			}
+			if classObj != nil {
+				if cls, ok := classObj.(*Class); ok {
+					rightIdent, rightOk := n.Right.(*ast.Identifier)
+					if rightOk {
+						if val, ok := cls.Constants[rightIdent.Value]; ok {
+							return val
+						}
+						return newError("undefined class constant: %s::%s", cls.Name, rightIdent.Value)
+					}
+				}
+			}
+			return newError("could not resolve class for :: operator")
+		}
+
 		left := Evaluate(n.Left, env, out)
 		if isError(left) {
 			return left
@@ -458,8 +530,12 @@ func Evaluate(node ast.Node, env *Environment, out io.Writer) Object {
 		for _, m := range n.Methods {
 			methods[m.Name.Value] = &Function{Parameters: m.Parameters, Body: m.Body, Env: env}
 		}
+		constants := make(map[string]Object)
+		for _, cst := range n.Constants {
+			constants[cst.Name] = Evaluate(cst.Value, env, out)
+		}
 		qualifiedName := env.QualifyName(n.Name.Value)
-		classObj := &Class{Name: qualifiedName, Methods: methods}
+		classObj := &Class{Name: qualifiedName, Methods: methods, Constants: constants}
 		env.Set(qualifiedName, classObj)
 		return NULL
 
@@ -1230,6 +1306,8 @@ func evalPrefixExpression(operator string, right Object) Object {
 		return evalBangOperatorExpression(right)
 	case "-":
 		return evalMinusPrefixOperatorExpression(right)
+	case "@":
+		return right
 	default:
 		return newError("unknown operator: %s%s", operator, right.Type())
 	}
@@ -1276,6 +1354,19 @@ func evalInfixExpression(operator string, left, right Object) Object {
 		return nativeBoolToBooleanObject(isEqualLoose(left, right))
 	case "!=":
 		return nativeBoolToBooleanObject(!isEqualLoose(left, right))
+	case "&&", "and":
+		return nativeBoolToBooleanObject(isTruthy(left) && isTruthy(right))
+	case "||", "or":
+		return nativeBoolToBooleanObject(isTruthy(left) || isTruthy(right))
+	case "??":
+		if left == NULL {
+			return right
+		}
+		return left
+	case "&":
+		return &Integer{Value: toIntegerVal(left) & toIntegerVal(right)}
+	case "|":
+		return &Integer{Value: toIntegerVal(left) | toIntegerVal(right)}
 	}
 
 	// Numerical expressions
@@ -1434,6 +1525,26 @@ func toString(obj Object) string {
 		return ""
 	default:
 		return ""
+	}
+}
+
+func toIntegerVal(obj Object) int64 {
+	switch o := obj.(type) {
+	case *Integer:
+		return o.Value
+	case *Float:
+		return int64(o.Value)
+	case *Boolean:
+		if o.Value {
+			return 1
+		}
+		return 0
+	case *String:
+		var i int64
+		fmt.Sscanf(o.Value, "%d", &i)
+		return i
+	default:
+		return 0
 	}
 }
 

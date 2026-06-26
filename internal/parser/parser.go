@@ -13,6 +13,11 @@ const (
 	_ int = iota
 	LOWEST
 	ASSIGN      // =
+	LOGICAL_OR  // || or or
+	LOGICAL_AND // && or and
+	BITWISE_OR  // |
+	BITWISE_AND // &
+	COALESCE    // ??
 	TERNARY     // ? :
 	EQUALS      // == or === or != or !==
 	LESSGREATER // > or < or >= or <=
@@ -27,6 +32,12 @@ var precedences = map[token.TokenType]int{
 	token.ASSIGN:          ASSIGN,
 	token.ADD_ASSIGN:      ASSIGN,
 	token.SUB_ASSIGN:      ASSIGN,
+	token.CONCAT_ASSIGN:   ASSIGN,
+	token.AND:             LOGICAL_AND,
+	token.OR:              LOGICAL_OR,
+	token.BITWISE_AND:     BITWISE_AND,
+	token.BITWISE_OR:      BITWISE_OR,
+	token.COALESCE:        COALESCE,
 	token.QUESTION:        TERNARY,
 	token.EQUAL:           EQUALS,
 	token.IDENTICAL:       EQUALS,
@@ -47,6 +58,7 @@ var precedences = map[token.TokenType]int{
 	token.LPAREN:          CALL,
 	token.OBJECT_OPERATOR: CALL,
 	token.LBRACKET:        CALL,
+	token.DOUBLE_COLON:    CALL,
 }
 
 type (
@@ -87,6 +99,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.INC, p.parsePrefixExpression)
 	p.registerPrefix(token.DEC, p.parsePrefixExpression)
+	p.registerPrefix(token.AT, p.parsePrefixExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionExpression)
 	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)
 
@@ -108,10 +121,17 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.ASSIGN, p.parseAssignExpression)
 	p.registerInfix(token.ADD_ASSIGN, p.parseAssignExpression)
 	p.registerInfix(token.SUB_ASSIGN, p.parseAssignExpression)
+	p.registerInfix(token.CONCAT_ASSIGN, p.parseAssignExpression)
+	p.registerInfix(token.AND, p.parseInfixExpression)
+	p.registerInfix(token.OR, p.parseInfixExpression)
+	p.registerInfix(token.BITWISE_AND, p.parseInfixExpression)
+	p.registerInfix(token.BITWISE_OR, p.parseInfixExpression)
+	p.registerInfix(token.COALESCE, p.parseInfixExpression)
 	p.registerInfix(token.QUESTION, p.parseTernaryExpression)
 	p.registerInfix(token.LPAREN, p.parseCallExpression)
 	p.registerInfix(token.OBJECT_OPERATOR, p.parseObjectAccessExpression)
 	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
+	p.registerInfix(token.DOUBLE_COLON, p.parseInfixExpression)
 	p.registerInfix(token.INC, p.parsePostExpression)
 	p.registerInfix(token.DEC, p.parsePostExpression)
 
@@ -187,6 +207,8 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseNamespaceStatement()
 	case token.USE:
 		return p.parseUseStatement()
+	case token.FOREACH:
+		return p.parseForeachStatement()
 	case token.TRY:
 		return p.parseTryCatchStatement()
 	case token.THROW:
@@ -567,6 +589,15 @@ func (p *Parser) parseFunctionStatement() *ast.FunctionStatement {
 		return nil
 	}
 	stmt.Parameters = p.parseFunctionParameters()
+
+	if p.peekTokenIs(token.COLON) {
+		p.nextToken()
+		if p.peekTokenIs(token.QUESTION) {
+			p.nextToken()
+		}
+		p.nextToken()
+	}
+
 	if !p.expectPeek(token.LBRACE) {
 		return nil
 	}
@@ -602,11 +633,26 @@ func (p *Parser) parseFunctionParameters() []*ast.Parameter {
 }
 
 func (p *Parser) parseParameter() *ast.Parameter {
+	var typeName string
+	nullable := false
+
+	if p.curTokenIs(token.QUESTION) {
+		nullable = true
+		p.nextToken()
+	}
+
+	if p.peekTokenIs(token.T_VARIABLE) {
+		typeName = p.curToken.Literal
+		p.nextToken()
+	}
+
 	param := &ast.Parameter{Token: p.curToken}
 	if !p.curTokenIs(token.T_VARIABLE) {
 		return nil
 	}
 	param.Var = &ast.Variable{Token: p.curToken, Value: p.curToken.Literal}
+	param.Type = typeName
+	param.Nullable = nullable
 	
 	if p.peekTokenIs(token.ASSIGN) {
 		p.nextToken() // consume variable
@@ -628,11 +674,31 @@ func (p *Parser) parseClassStatement() *ast.ClassStatement {
 	p.nextToken() // consume '{'
 	
 	stmt.Methods = []*ast.FunctionStatement{}
+	stmt.Constants = []*ast.ClassConstant{}
 	for !p.curTokenIs(token.RBRACE) && !p.curTokenIs(token.EOF) {
 		if p.curTokenIs(token.PUBLIC) || p.curTokenIs(token.PRIVATE) || p.curTokenIs(token.PROTECTED) {
 			p.nextToken()
 		}
-		if p.curTokenIs(token.FUNCTION) {
+		if p.curTokenIs(token.CONST) {
+			p.nextToken() // consume 'const'
+			if !p.curTokenIs(token.T_IDENTIFIER) {
+				return nil
+			}
+			constName := p.curToken.Literal
+			if !p.expectPeek(token.ASSIGN) {
+				return nil
+			}
+			p.nextToken() // consume '='
+			constValue := p.parseExpression(LOWEST)
+			stmt.Constants = append(stmt.Constants, &ast.ClassConstant{
+				Name:  constName,
+				Value: constValue,
+			})
+			if p.peekTokenIs(token.SEMICOLON) {
+				p.nextToken()
+			}
+			p.nextToken()
+		} else if p.curTokenIs(token.FUNCTION) {
 			fn := p.parseFunctionStatement()
 			if fn != nil {
 				stmt.Methods = append(stmt.Methods, fn)
@@ -945,6 +1011,51 @@ func (p *Parser) parseNamespaceStatement() *ast.NamespaceStatement {
 	return stmt
 }
 
+func (p *Parser) parseForeachStatement() *ast.ForeachStatement {
+	stmt := &ast.ForeachStatement{Token: p.curToken}
+
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+	p.nextToken() // consume '('
+
+	stmt.Expression = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(token.AS) {
+		return nil
+	}
+	p.nextToken() // consume 'as'
+
+	if !p.curTokenIs(token.T_VARIABLE) {
+		return nil
+	}
+	firstVar := &ast.Variable{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekTokenIs(token.DOUBLE_ARROW) {
+		p.nextToken() // consume first variable
+		p.nextToken() // consume '=>'
+		if !p.curTokenIs(token.T_VARIABLE) {
+			return nil
+		}
+		stmt.Key = firstVar
+		stmt.Value = &ast.Variable{Token: p.curToken, Value: p.curToken.Literal}
+	} else {
+		stmt.Value = firstVar
+	}
+
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	stmt.Body = p.parseBlockStatement()
+
+	return stmt
+}
+
 func (p *Parser) parseUseStatement() *ast.UseStatement {
 	stmt := &ast.UseStatement{Token: p.curToken}
 	if !p.expectPeek(token.T_IDENTIFIER) {
@@ -999,6 +1110,14 @@ func (p *Parser) parseFunctionExpression() ast.Expression {
 			}
 		}
 		// curToken is now ')'
+	}
+
+	if p.peekTokenIs(token.COLON) {
+		p.nextToken()
+		if p.peekTokenIs(token.QUESTION) {
+			p.nextToken()
+		}
+		p.nextToken()
 	}
 
 	if !p.expectPeek(token.LBRACE) {

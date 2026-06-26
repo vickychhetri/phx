@@ -301,7 +301,13 @@ func (l *Lexer) NextToken() token.Token {
 	case '%':
 		tok = token.NewToken(token.MOD, l.ch, l.currentPos())
 	case '.':
-		tok = token.NewToken(token.CONCAT, l.ch, l.currentPos())
+		if l.peekChar() == '=' {
+			startPos := l.currentPos()
+			l.readChar()
+			tok = token.Token{Type: token.CONCAT_ASSIGN, Literal: ".=", Pos: startPos}
+		} else {
+			tok = token.NewToken(token.CONCAT, l.ch, l.currentPos())
+		}
 	case ';':
 		tok = token.NewToken(token.SEMICOLON, l.ch, l.currentPos())
 	case ',':
@@ -350,10 +356,40 @@ func (l *Lexer) NextToken() token.Token {
 	case '"', '\'':
 		tok = l.readString(l.ch)
 		return tok
+	case '&':
+		if l.peekChar() == '&' {
+			startPos := l.currentPos()
+			l.readChar()
+			tok = token.Token{Type: token.AND, Literal: "&&", Pos: startPos}
+		} else {
+			tok = token.NewToken(token.BITWISE_AND, l.ch, l.currentPos())
+		}
+	case '|':
+		if l.peekChar() == '|' {
+			startPos := l.currentPos()
+			l.readChar()
+			tok = token.Token{Type: token.OR, Literal: "||", Pos: startPos}
+		} else {
+			tok = token.NewToken(token.BITWISE_OR, l.ch, l.currentPos())
+		}
+	case '@':
+		tok = token.NewToken(token.AT, l.ch, l.currentPos())
 	case '?':
-		tok = token.NewToken(token.QUESTION, l.ch, l.currentPos())
+		if l.peekChar() == '?' {
+			startPos := l.currentPos()
+			l.readChar()
+			tok = token.Token{Type: token.COALESCE, Literal: "??", Pos: startPos}
+		} else {
+			tok = token.NewToken(token.QUESTION, l.ch, l.currentPos())
+		}
 	case ':':
-		tok = token.NewToken(token.COLON, l.ch, l.currentPos())
+		if l.peekChar() == ':' {
+			startPos := l.currentPos()
+			l.readChar()
+			tok = token.Token{Type: token.DOUBLE_COLON, Literal: "::", Pos: startPos}
+		} else {
+			tok = token.NewToken(token.COLON, l.ch, l.currentPos())
+		}
 	case '$':
 		if isLetter(l.peekChar()) {
 			startPos := l.currentPos()

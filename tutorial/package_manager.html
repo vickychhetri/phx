@@ -377,6 +377,7 @@
             <li><a href="#searching">5. Registry Search</a></li>
             <li><a href="#autoload">6. Autoloading Mechanics</a></li>
             <li><a href="#example">7. End-to-End Example</a></li>
+            <li><a href="#cloud">8. Hosting in the Cloud</a></li>
         </ul>
     </aside>
 
@@ -570,6 +571,39 @@ $logger->success("Factorial of 5 is: " . $result);
 $ ./my_math_app
 [INFO] Starting calculation...
 [SUCCESS] Factorial of 5 is: 120</code></pre>
+            </div>
+        </section>
+        
+        <!-- CLOUD HOSTING -->
+        <section id="cloud">
+            <div class="section-card">
+                <h2>8. Hosting Packages in the Cloud</h2>
+                <p>The PHX package manager supports hosting and resolving packages in the cloud via static HTTP/HTTPS servers (such as GitHub, public filesystems, S3, or CDNs) for open-source distribution.</p>
+
+                <h3>How to Publish to the Cloud</h3>
+                <p>Because the registry structure is serverless and static, you can host your own remote package registry easily:</p>
+                <ul class="square-list">
+                    <li>Publish your packages locally using <code>phx pkg publish</code>. This builds the package ZIPs and generates/updates the index files under your local <code>~/.phx_registry/</code> directory.</li>
+                    <li>Create a public GitHub repository (e.g., <code>github.com/username/phx-registry</code>) or set up a static web server.</li>
+                    <li>Push the contents of the <code>~/.phx_registry/</code> directory directly to the root of your repository or web server.</li>
+                </ul>
+
+                <h3>How to Consume Cloud Packages</h3>
+                <p>To use packages from a remote cloud registry, configure the registry URL by setting the <code>PHX_REGISTRY_URL</code> environment variable when running commands:</p>
+                <pre><div class="highlight-bar"></div><code>$ PHX_REGISTRY_URL="https://raw.githubusercontent.com/username/phx-registry/main" phx pkg search
+$ PHX_REGISTRY_URL="https://raw.githubusercontent.com/username/phx-registry/main" phx pkg install</code></pre>
+                <p>The package manager will automatically fetch <code>index.json</code> metadata, download package ZIP archives, and cache them locally under <code>~/.phx_registry/cache/</code>. Subsequent commands can run completely offline, utilizing the cached dependencies.</p>
+
+                <h3>Direct Package URL Dependencies (Simplified Option)</h3>
+                <p>Instead of setting up or configuring a static registry server, you can add dependencies directly using a repository URL or zip archive URL:</p>
+                <pre><div class="highlight-bar"></div><code>$ phx pkg add https://github.com/vickychhetri/package</code></pre>
+                <p>This will download the repository, inspect its <code>phx.json</code> manifest to detect the package name, and register it directly in your <code>phx.json</code> manifest:</p>
+                <pre><div class="highlight-bar"></div><code>{
+  "dependencies": {
+    "package-name": "https://github.com/vickychhetri/package"
+  }
+}</code></pre>
+                <p>When running <code>phx pkg install</code>, the package manager automatically fetches the package from the URL, handles local caching, and strips any top-level directory wrapper (e.g. GitHub folder wraps like <code>package-main/</code>) during extraction, keeping your <code>phx_packages/</code> directory clean and ready to use.</p>
             </div>
         </section>
     </main>
